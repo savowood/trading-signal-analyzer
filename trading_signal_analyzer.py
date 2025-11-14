@@ -71,7 +71,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Version info
-VERSION = "0.9"
+VERSION = "0.91"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -125,6 +125,46 @@ USE AT YOUR OWN RISK.
     print("\n✅ Terms accepted. Proceeding...\n")
 
 
+def is_likely_delisted(ticker: str, price: float, volume: int, market_cap: float) -> bool:
+    """
+    Check if a stock is likely delisted or inactive
+    
+    Args:
+        ticker: Stock symbol
+        price: Current price
+        volume: Current volume
+        market_cap: Market capitalization
+        
+    Returns:
+        True if stock appears delisted/inactive
+    """
+    # Delisting indicators:
+    # 1. Extremely low price (< $0.0001) with no volume
+    # 2. Zero or near-zero volume for extended period
+    # 3. Market cap extremely low or zero
+    # 4. Ticker ends with common delisting suffixes
+    
+    delisting_suffixes = ['Q', 'E', 'D']  # Bankruptcy, delinquent, new issue, etc.
+    
+    # Check for delisting suffix
+    if any(ticker.endswith(suffix) for suffix in delisting_suffixes):
+        return True
+    
+    # Extremely low price with no volume
+    if price < 0.0001 and volume < 1000:
+        return True
+    
+    # Zero volume (completely inactive)
+    if volume == 0:
+        return True
+    
+    # Market cap suspicious (too small or zero)
+    if market_cap and market_cap < 100000:  # Under $100k market cap
+        return True
+    
+    return False
+
+
 def scan_ross_cameron_stocks(market_choice: str = '1') -> List[Dict]:
     """
     Integrated Ross Cameron 5 Pillars Scanner
@@ -152,8 +192,8 @@ def scan_ross_cameron_stocks(market_choice: str = '1') -> List[Dict]:
         else:
             q = q.set_markets('america')
         
-        # Apply 5 pillars filters
-        q = q.where(col('close').between(1, 20))  # Price range
+        # Apply 5 pillars filters (modified for sub-penny stocks)
+        q = q.where(col('close').between(0.0001, 20))  # Allow sub-penny stocks
         q = q.where(col('relative_volume_10d_calc') >= 2.0)  # Relative volume
         q = q.where(col('market_cap_basic') < 10_000_000_000)  # Market cap
         q = q.where(col('change_from_open').between(-50, 50))
@@ -207,6 +247,11 @@ def scan_ross_cameron_stocks(market_choice: str = '1') -> List[Dict]:
                     pattern_score
                 ])
                 
+                # Check if likely delisted
+                volume_val = row.get('volume', 0) or 0
+                if is_likely_delisted(ticker, price, volume_val, market_cap):
+                    continue  # Skip delisted stocks
+                
                 if pillars_met >= 2:
                     results.append({
                         'Ticker': ticker,
@@ -243,12 +288,24 @@ def display_scanned_stocks(stocks: List[Dict]):
         print("No stocks found")
         return
     
-    print(f"\n{'#':<4} {'Ticker':<8} {'Price':<10} {'Score':<7} {'RelVol':<8} {'Week%':<9} {'Today%':<9}")
+    print(f"\n{'#':<4} {'Ticker':<8} {'Price':<12} {'Score':<7} {'RelVol':<8} {'Week%':<9} {'Today%':<9}")
     print("-" * 80)
     
     for idx, stock in enumerate(stocks, 1):
         score_emoji = "🔥🔥🔥" if stock['Score'] >= 4 else "🔥🔥" if stock['Score'] >= 3 else "🔥"
-        print(f"{idx:<4} {stock['Ticker']:<8} ${stock['Price']:<9.2f} {stock['Score']}/5 {score_emoji:<4} "
+        
+        # Format price based on value (sub-penny support)
+        price = stock['Price']
+        if price < 0.01:
+            price_str = f"${price:.6f}"
+        elif price < 0.10:
+            price_str = f"${price:.4f}"
+        elif price < 1.00:
+            price_str = f"${price:.3f}"
+        else:
+            price_str = f"${price:.2f}"
+        
+        print(f"{idx:<4} {stock['Ticker']:<8} {price_str:<12} {stock['Score']}/5 {score_emoji:<4} "
               f"{stock['RelVol']:<7.1f}x {stock['Week%']:>+7.1f}% {stock['Today%']:>+7.1f}%")
     
     print("-" * 80)
@@ -579,16 +636,43 @@ def display_recommendation(rec: Dict):
     print(f"📊 TRADING ANALYSIS: {rec['ticker']}")
     print("=" * 70)
     
-    print(f"\n💰 CURRENT PRICE: ${rec['current_price']:.2f}")
-    print(f"📈 VWAP: ${rec['vwap']:.2f} ({rec['price_vs_vwap']:+.2f}%)")
+    # Format price based on value (sub-penny stocks show more decimals)
+    price = rec['current_price']
+    if price < 0.01:
+        price_format = f"${price:.6f}"
+    elif price < 0.10:
+        price_format = f"${price:.4f}"
+    elif price < 1.00:
+        price_format = f"${price:.3f}"
+    else:
+        price_format = f"${price:.2f}"
+    
+    print(f"\n💰 CURRENT PRICE: {price_format}")
+    
+    # Format VWAP and bands with appropriate decimals
+    vwap = rec['vwap']
+    if price < 0.01:
+        vwap_format = f"${vwap:.6f}"
+        band_decimals = 6
+    elif price < 0.10:
+        vwap_format = f"${vwap:.4f}"
+        band_decimals = 4
+    elif price < 1.00:
+        vwap_format = f"${vwap:.3f}"
+        band_decimals = 3
+    else:
+        vwap_format = f"${vwap:.2f}"
+        band_decimals = 2
+    
+    print(f"📈 VWAP: {vwap_format} ({rec['price_vs_vwap']:+.2f}%)")
     print(f"📍 Position: {rec['vwap_zone']}")
     
     print(f"\n📉 VWAP BANDS:")
-    print(f"   +2σ: ${rec['upper_2std']:.2f}")
-    print(f"   +1σ: ${rec['upper_1std']:.2f}")
-    print(f"   VWAP: ${rec['vwap']:.2f}")
-    print(f"   -1σ: ${rec['lower_1std']:.2f}")
-    print(f"   -2σ: ${rec['lower_2std']:.2f}")
+    print(f"   +2σ: ${rec['upper_2std']:.{band_decimals}f}")
+    print(f"   +1σ: ${rec['upper_1std']:.{band_decimals}f}")
+    print(f"   VWAP: ${rec['vwap']:.{band_decimals}f}")
+    print(f"   -1σ: ${rec['lower_1std']:.{band_decimals}f}")
+    print(f"   -2σ: ${rec['lower_2std']:.{band_decimals}f}")
     
     print(f"\n📊 MACD:")
     print(f"   MACD Line: {rec['macd']:.4f}")
@@ -607,14 +691,14 @@ def display_recommendation(rec: Dict):
     direction_emoji = "🟢" if rec['trade_direction'] == "LONG" else "🔴"
     print(f"\n{direction_emoji} DIRECTION: {rec['trade_direction']} ({rec['signal_strength']} signal)")
     
-    print(f"\n📍 ENTRY POINT: ${rec['entry_point']:.2f}")
+    print(f"\n📍 ENTRY POINT: ${rec['entry_point']:.{band_decimals}f}")
     print(f"   Reason: {rec['entry_reason']}")
     
-    print(f"\n🛑 STOP LOSS: ${rec['stop_loss']:.2f}")
-    print(f"   Risk: ${rec['risk']:.2f} ({(rec['risk']/rec['entry_point']*100):.2f}%)")
+    print(f"\n🛑 STOP LOSS: ${rec['stop_loss']:.{band_decimals}f}")
+    print(f"   Risk: ${rec['risk']:.{band_decimals}f} ({(rec['risk']/rec['entry_point']*100):.2f}%)")
     
-    print(f"\n🎯 TAKE PROFIT: ${rec['take_profit']:.2f}")
-    print(f"   Reward: ${rec['reward']:.2f} ({(rec['reward']/rec['entry_point']*100):.2f}%)")
+    print(f"\n🎯 TAKE PROFIT: ${rec['take_profit']:.{band_decimals}f}")
+    print(f"   Reward: ${rec['reward']:.{band_decimals}f} ({(rec['reward']/rec['entry_point']*100):.2f}%)")
     
     print(f"\n⚖️  RISK/REWARD: {rec['risk_reward_ratio']:.2f}:1")
     print(f"   {rec['ratio_recommendation']}")
@@ -688,6 +772,9 @@ def main():
     # Store last scan results
     last_scanned_stocks = []
     
+    # Track current timeframe name
+    # (already set during initial configuration)
+    
     # Main loop
     while True:
         print("\n" + "=" * 70)
@@ -752,22 +839,33 @@ through use of this software.
         
         # Change timeframe
         elif main_choice == '5':
-            print(f"\nCurrent: {period} period with {interval} intervals")
+            print(f"\nCurrent: {timeframe_name} - {period} period with {interval} intervals")
             print("\nSelect new timeframe:")
-            print("1. Intraday (5 days, 5-minute intervals)")
-            print("2. Short-term (1 month, 1-hour intervals)")
-            print("3. Medium-term (3 months, 1-day intervals)")
+            print("1. Scalping (1 day, 1-minute intervals)")
+            print("2. Intraday (5 days, 5-minute intervals)")
+            print("3. Short-term (1 month, 1-hour intervals)")
+            print("4. Medium-term (3 months, 1-day intervals)")
+            print("5. Long-term (1 year, 1-week intervals)")
             
-            tf_choice = input("Enter choice (1-3): ").strip()
+            tf_choice = input("Enter choice (1-5): ").strip()
             
-            if tf_choice == '2':
-                period, interval = "1mo", "1h"
+            if tf_choice == '1':
+                period, interval = "1d", "1m"
+                timeframe_name = "Scalping"
             elif tf_choice == '3':
+                period, interval = "1mo", "1h"
+                timeframe_name = "Short-term"
+            elif tf_choice == '4':
                 period, interval = "3mo", "1d"
+                timeframe_name = "Medium-term"
+            elif tf_choice == '5':
+                period, interval = "1y", "1wk"
+                timeframe_name = "Long-term"
             else:
                 period, interval = "5d", "5m"
+                timeframe_name = "Intraday"
             
-            print(f"✅ Updated to {period} period with {interval} intervals")
+            print(f"✅ Updated to {timeframe_name}: {period} period with {interval} intervals")
             continue
         
         # Get tickers to analyze

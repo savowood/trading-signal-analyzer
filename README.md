@@ -1,4 +1,4 @@
-# Trading Signal Analyzer v0.9
+# Trading Signal Analyzer v0.91
 
 **Advanced Technical Analysis Tool for Day Trading**
 
@@ -6,7 +6,7 @@ A Python-based stock scanner and technical analysis tool that combines Ross Came
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
-![Version](https://img.shields.io/badge/version-0.9-green.svg)
+![Version](https://img.shields.io/badge/version-0.91-green.svg)
 
 ---
 
@@ -27,14 +27,15 @@ Trading stocks, options, and other securities involves **substantial risk** and 
 
 ## 🎯 Features
 
-### Integrated Ross Cameron Scanner
+### Ross Cameron Scanner
 - Scans NASDAQ, NYSE, or all US markets
 - Filters stocks based on the **5 Pillars of Day Trading**:
   1. Strong Relative Volume (2x+ average)
   2. Float under 100 million shares
-  3. Price range $1-$20 (momentum sweet spot)
+  3. Price range $0.0001-$20 (includes sub-penny stocks)
   4. Recent catalyst (10%+ price movement)
   5. Chart pattern (breakout or consolidation)
+- **Sub-penny stock support** - Displays accurate pricing for stocks under $0.01
 
 ### Technical Analysis
 - **VWAP (Volume Weighted Average Price)** with 1σ and 2σ bands
@@ -92,7 +93,7 @@ python trading_signal_analyzer.py
 ### First Run
 1. **Accept Disclaimer** - You must accept terms and conditions
 2. **Set Risk/Reward Ratio** - Default is 3:1, can be customized
-3. **Choose Timeframe** - Intraday (5min), Short-term (1hr), or Medium-term (1day)
+3. **Choose Timeframe** - Scalping (1m), Intraday (5m), Short-term (1h), Medium-term (1d), or Long-term (1wk)
 
 ### Main Menu Options
 
@@ -114,7 +115,7 @@ python trading_signal_analyzer.py
 - Common ratios: 2:1, 3:1, 5:1
 
 **5. Change Timeframe**
-- Switch between intraday/short/medium-term analysis
+- Switch between scalping/intraday/short/medium/long-term analysis
 
 **6. Quit**
 - Clean exit with final disclaimer
