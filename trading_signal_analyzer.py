@@ -72,7 +72,7 @@ warnings.filterwarnings('ignore')
 
 # Version info
 VERSION = "0.9"
-AUTHOR = "Michael"
+AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
 # Import TradingView screener
@@ -656,20 +656,31 @@ def main():
     
     # Get analysis timeframe (persistent across session)
     print("\nSelect analysis timeframe:")
-    print("1. Intraday (5 days, 5-minute intervals)")
-    print("2. Short-term (1 month, 1-hour intervals)")
-    print("3. Medium-term (3 months, 1-day intervals)")
+    print("1. Scalping (1 day, 1-minute intervals)")
+    print("2. Intraday (5 days, 5-minute intervals)")
+    print("3. Short-term (1 month, 1-hour intervals)")
+    print("4. Medium-term (3 months, 1-day intervals)")
+    print("5. Long-term (1 year, 1-week intervals)")
     
-    timeframe_choice = input("Enter choice (1-3) or press Enter for intraday: ").strip()
+    timeframe_choice = input("Enter choice (1-5) or press Enter for intraday: ").strip()
     
-    if timeframe_choice == '2':
-        period, interval = "1mo", "1h"
+    if timeframe_choice == '1':
+        period, interval = "1d", "1m"
+        timeframe_name = "Scalping"
     elif timeframe_choice == '3':
+        period, interval = "1mo", "1h"
+        timeframe_name = "Short-term"
+    elif timeframe_choice == '4':
         period, interval = "3mo", "1d"
+        timeframe_name = "Medium-term"
+    elif timeframe_choice == '5':
+        period, interval = "1y", "1wk"
+        timeframe_name = "Long-term"
     else:
         period, interval = "5d", "5m"
+        timeframe_name = "Intraday"
     
-    print(f"\n✅ Using {period} period with {interval} intervals")
+    print(f"\n✅ Using {timeframe_name}: {period} period with {interval} intervals")
     
     # Initialize analyzer
     analyzer = TechnicalAnalyzer(risk_reward_ratio=risk_reward)
@@ -717,7 +728,7 @@ through use of this software.
             print("\n📊 Session Statistics:")
             print(f"   • Version: {VERSION}")
             print(f"   • License: {LICENSE} (Open Source)")
-            print(f"   • GitHub: https://github.com/yourusername/trading-signal-analyzer")
+            print(f"   • GitHub: https://github.com/savowood/trading-signal-analyzer")
             print("\n💡 Contributions Welcome!")
             print("   Found a bug? Have an improvement? Submit a pull request!")
             print("   All modifications must be shared back per GPL v3 license.")

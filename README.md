@@ -195,9 +195,11 @@ The technical analysis implementation (VWAP, MACD) is original work by the autho
 
 | Timeframe | Period | Interval | Best For |
 |-----------|--------|----------|----------|
-| Intraday | 5 days | 5 minutes | Day trading, scalping |
-| Short-term | 1 month | 1 hour | Swing trading |
-| Medium-term | 3 months | 1 day | Position trading |
+| Scalping | 1 day | 1 minute | Ultra-short term, quick trades |
+| Intraday | 5 days | 5 minutes | Day trading, same-day entries/exits |
+| Short-term | 1 month | 1 hour | Swing trading, multi-day holds |
+| Medium-term | 3 months | 1 day | Position trading, weeks to months |
+| Long-term | 1 year | 1 week | Investment trading, months to year |
 
 ### Risk/Reward Ratios
 
