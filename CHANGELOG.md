@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.92] - 2025-01-XX
+
+### Added
+- **FOREX Scanner** - Scan top 10 major FOREX pairs
+  - EUR/USD, GBP/USD, USD/JPY, USD/CHF (majors)
+  - AUD/USD, NZD/USD, USD/CAD (commodity currencies)
+  - EUR/GBP, EUR/JPY, GBP/JPY (crosses)
+  - Displays price, change%, week%, and volatility
+  - 24/5 market coverage
+- **Cryptocurrency Scanner** - Scan top 20 highly active cryptocurrencies
+  - BTC, ETH, BNB, SOL, XRP, ADA, DOGE, and more
+  - Displays hour%, day%, week% changes
+  - Activity scoring based on volume and volatility
+  - 24/7 market coverage
+- **Unified Scanner Interface** - Choose from stocks, FOREX, or crypto
+  - All scanners accessible from main menu
+  - Consistent selection interface across asset types
+  - Stores last scan results for quick re-analysis
+  - Smart formatting for different asset classes
+- **Enhanced Manual Entry** - Examples provided for stocks, FOREX, and crypto formats
+- **SMA + ATR Bands** - Alternative to VWAP for assets without volume data
+  - Automatically detects if volume data is available
+  - Uses 20-period SMA with ATR-based bands for FOREX/crypto
+  - Uses VWAP with standard deviation bands for stocks
+  - Seamless switching between indicators
+
+### Changed
+- Main menu expanded from 6 to 8 options
+- Generic `choose_from_scan()` function replaces stock-specific version
+- Updated menu numbering to accommodate new features
+- Version number updated to 0.92
+- Technical analysis now adapts to asset type (VWAP for stocks, SMA+ATR for FOREX/crypto)
+
+### Fixed
+- Typo in calculate_entry_exit function (lower_2sd → lower_2std)
+- **FOREX and crypto analysis now works correctly** - Previously showed NaN values due to missing volume data
+- Volume detection added to automatically choose appropriate indicators
+- Display function now shows correct indicator type (VWAP vs SMA)
+
+---
+
 ## [0.91] - 2025-01-XX
 
 ### Added
@@ -38,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated scanner to scan from $0.0001 instead of $1.00 minimum
 - Improved display formatting for scanner results table
 - Enhanced precision in all price-related calculations
+- Removed named references to Ross Cameron from user-facing text (kept in code comments for attribution)
 
 ---
 
@@ -121,7 +163,7 @@ See [GitHub Issues](https://github.com/savowood/trading-signal-analyzer/issues) 
 
 ## Upcoming Features (Roadmap)
 
-### Planned for v0.92
+### Planned for v0.93
 - [ ] Enhanced pattern recognition algorithms
 - [ ] Additional technical indicators (RSI, Bollinger Bands)
 - [ ] Export analysis results to CSV
