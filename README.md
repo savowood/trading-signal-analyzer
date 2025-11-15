@@ -2,7 +2,7 @@
 
 **Advanced Technical Analysis Tool for Day Trading**
 
-A Python-based stock scanner and technical analysis tool that combines Ross Cameron's 5 Pillars of Day Trading methodology with VWAP bands and MACD indicators to identify optimal entry and exit points.
+A Python-based stock scanner and technical analysis tool influenced by Ross Cameron's 5 Pillars of Day Trading methodology with VWAP bands and MACD indicators to identify optimal entry and exit points.
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
