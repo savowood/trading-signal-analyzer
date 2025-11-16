@@ -1,12 +1,12 @@
-# Trading Signal Analyzer v0.92
+# Trading Signal Analyzer v0.93
 
 **Advanced Technical Analysis Tool for Day Trading - Stocks, FOREX & Crypto**
 
-A Python-based multi-asset scanner and technical analysis tool that combines the 5 Pillars of Day Trading methodology with VWAP bands and MACD indicators to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.
+A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, and MACD indicators to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
-![Version](https://img.shields.io/badge/version-0.92-green.svg)
+![Version](https://img.shields.io/badge/version-0.93-green.svg)
 
 ---
 
@@ -28,19 +28,26 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 ## 🎯 Features
 
 ### Multi-Asset Scanning
-- **Stock Scanner** - Momentum stocks using the 5 Pillars methodology losely based on Ross Cameron's pillars
+- **Stock Scanner** - Momentum stocks using the 5 Pillars methodology
 - **FOREX Scanner** - Top 10 major currency pairs (24/5 trading)
 - **Crypto Scanner** - Top 20 active cryptocurrencies (24/7 trading)
 
-### Stock Scanner (5 Pillars)
+### Stock Scanner (NEW 5 Pillars - v0.93)
 - Scans NASDAQ, NYSE, or all US markets
-- Filters stocks based on the **5 Pillars of Day Trading**:
-  1. Strong Relative Volume (2x+ average)
-  2. Float under 100 million shares
-  3. Price range $0.0001-$20 (includes sub-penny stocks)
-  4. Recent catalyst (10%+ price movement)
-  5. Chart pattern (breakout or consolidation)
-- **Sub-penny stock support** - Displays accurate pricing for stocks under $0.01
+- **NEW aggressive momentum criteria:**
+  1. **Up 10%+ on the day** (active intraday momentum)
+  2. **500% relative volume** (5x average - institutional interest)
+  3. **News event detected** (catalyst moving stock higher)
+  4. **Price range $2-$20** (default, configurable)
+  5. **Under 20M shares float** (squeeze potential)
+- **Configurable price ranges:**
+  - Default: $2-$20 (recommended)
+  - Penny stocks: $0.10-$2.00
+  - Sub-penny: $0.0001-$0.10
+  - Mid-cap: $20-$100
+  - Custom: User-defined
+- **Enhanced display** with low float indicators (⭐) and catalyst strength
+- **Quality over quantity** - fewer, higher-probability setups
 - **Delisting detection** - Automatically filters out inactive stocks
 
 ### FOREX Scanner
@@ -61,7 +68,6 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 ### Technical Analysis
 - **VWAP (Volume Weighted Average Price)** with 1σ and 2σ bands
 - **MACD** (Moving Average Convergence Divergence) with crossover detection
-- **SMA(20) with ATR bands** (When volume data isn't available for VWAP)
 - **Automatic entry/exit point calculation**
 - **Risk/Reward ratio optimization** (default 3:1, customizable)
 - **Position relative to VWAP bands** (overbought/oversold zones)
@@ -112,7 +118,6 @@ pip install -r requirements.txt
 ```bash
 python trading_signal_analyzer.py
 ```
-You may need to use python3 instead of just python on some systems.  Consult your man pages on how to make an alias.
 
 ### First Run
 1. **Accept Disclaimer** - You must accept terms and conditions
@@ -231,7 +236,6 @@ This software implements the "5 Pillars of Day Trading" methodology for stock se
 - Volatility for profit potential
 - Recent catalyst for price movement
 - Technical pattern confirmation
-This is losely based on the five pillars from Warrior Trading and Ross Cameron.  It is NOT the same.
 
 **Learn more:**
 - Educational resources on day trading strategies
@@ -328,9 +332,7 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## 🙏 Acknowledgments
 
-- **Warrior Trading, Ross Cameron, and the entire Trading Community** - For the 5 Pillars of Day Trading methodology
-- **Joovier** - The YouTuber who shared a ton of knowledge in his multi-hour videos
-- **My AMAZING girlfriend** - For making me get off my butt and finally start doing this
+- **Trading Community** - For the 5 Pillars of Day Trading methodology
 - **TradingView** - Screener API for market data
 - **Yahoo Finance** - Historical price data via yfinance
 - **Open Source Community** - For Python libraries and tools
@@ -344,10 +346,6 @@ See the [LICENSE](LICENSE) file for full details.
 - [Investopedia Trading Basics](https://www.investopedia.com/trading-4427765)
 - [Babypips FOREX School](https://www.babypips.com/learn/forex) (for FOREX)
 - [CoinMarketCap Learn](https://coinmarketcap.com/alexandria) (for crypto)
-- [Warrior Trading and Ross Cameron](https://www.warriortrading.com/)
-- [Ross Cameron's YouTube Channel](https://www.youtube.com/@DaytradeWarrior)
-- [Joovier's YouTube channel](https://www.youtube.com/@JooviersGems)
-
 
 ### Risk Management
 - Never risk more than 1-2% of account per trade
@@ -408,13 +406,17 @@ pip install tradingview-screener
 
 ## 🔮 Roadmap
 
-**Current Version (v0.92):**
+**Current Version (v0.93):**
+- ✅ NEW aggressive 5 Pillars momentum criteria
+- ✅ Configurable price ranges ($2-$20 default)
+- ✅ 500% relative volume filter (5x average)
+- ✅ Low float detection (<20M shares)
 - ✅ Multi-asset support (stocks, FOREX, crypto)
+- ✅ Dark Flow Scanner (institutional levels)
 - ✅ 5 timeframe options
-- ✅ Sub-penny stock support
 - ✅ VWAP + MACD analysis
 
-**Planned Features (v0.93+):**
+**Planned Features (v0.94+):**
 - [ ] RSI and Bollinger Bands indicators
 - [ ] Export analysis to CSV/PDF
 - [ ] Trade journaling/logging
@@ -429,7 +431,7 @@ pip install tradingview-screener
 - [ ] Paper trading simulation
 
 **Future Considerations:**
-- [ ] GUI (optional)
+- [ ] GUI interface (optional)
 - [ ] Mobile app companion
 - [ ] Community sharing of setups
 - [ ] Advanced charting integration
@@ -448,12 +450,13 @@ If you find this tool useful, please consider giving it a star on GitHub!
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history and release notes.
 
-**Latest Updates (v0.92):**
-- Added FOREX scanner for top 10 currency pairs
-- Added cryptocurrency scanner for top 20 coins
-- Enhanced menu system with 8 options
-- Unified asset selection interface
-- Smart formatting for different asset types
+**Latest Updates (v0.93):**
+- **NEW aggressive 5 Pillars** - Up 10%+, 5x volume, catalyst, $2-$20, <20M float
+- **Configurable price ranges** - 5 presets + custom option
+- **Enhanced momentum filtering** - Quality over quantity
+- **Low float indicators** - Squeeze potential detection
+- **Catalyst strength classification** - STRONG/MODERATE/PRESENT
+- **Improved scanner display** - Sorted by best setups first
 
 ---
 

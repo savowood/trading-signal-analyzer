@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.93] - 2025-01-XX
+
+### Changed - NEW 5 PILLARS CRITERIA
+**Complete overhaul of momentum scanner with new, more aggressive criteria:**
+
+#### NEW 5 Pillars:
+1. **Up 10%+ on the day** (was: any price movement)
+   - Filters for strong intraday momentum
+   - Only shows stocks actively moving UP
+   - Catches momentum early in the day
+
+2. **500% relative volume (5x average)** (was: 2x average)
+   - Much stronger volume requirement
+   - Indicates significant institutional interest
+   - Filters out low-conviction moves
+
+3. **News event moving stock higher** (was: any catalyst)
+   - Catalyst detection via extreme moves + volume
+   - Strong/moderate/present classification
+   - Indicates fundamental driver behind move
+
+4. **Price range $2-$20** (was: $0.0001-$20)
+   - Default changed to $2-$20 for better liquidity
+   - Configurable with 5 preset ranges + custom option
+   - Eliminates most penny stocks by default
+   - Sub-penny and penny options still available
+
+5. **Under 20M shares float** (was: under 100M)
+   - Much tighter float requirement
+   - Optimized for squeeze potential
+   - Filters for low-float runners
+
+### Added
+- **Price range configuration menu** with presets:
+  - Default: $2-$20 (recommended)
+  - Penny stocks: $0.10-$2.00
+  - Sub-penny: $0.0001-$0.10
+  - Mid-cap: $20-$100
+  - Custom: User-defined range
+- **Enhanced scanner output** showing:
+  - Low float indicator (⭐)
+  - Today's % change (primary sort)
+  - Catalyst strength (STRONG/MODERATE/PRESENT)
+  - Clearer 5 Pillars explanation in header
+- **Improved filtering**:
+  - Minimum 3 of 5 pillars required (was: 2 of 5)
+  - Sort by score then today's % move
+  - Up to 100 results scanned (was: 50)
+
+### Changed
+- Scanner now sorts by **biggest movers today** (was: highest relative volume)
+- Default price range is **$2-$20** (was: $0.0001-$20)
+- Minimum pillars met: **3 of 5** (was: 2 of 5)
+- Scanner criteria much more aggressive for momentum plays
+- Display format updated for new criteria
+
+### Why These Changes?
+The new 5 Pillars are designed to catch **active momentum plays** with:
+- Strong intraday movement (already up 10%+)
+- Explosive volume (5x average)
+- Fundamental catalyst (news/event driving move)
+- Good liquidity ($2-$20 range)
+- Squeeze potential (low float <20M)
+
+This eliminates most noise and focuses on high-probability momentum setups.
+
+---
+
 ## [0.92] - 2025-01-XX
 
 ### Added
