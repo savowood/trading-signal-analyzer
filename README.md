@@ -2,7 +2,7 @@
 
 **Advanced Technical Analysis Tool for Day Trading - Stocks, FOREX & Crypto**
 
-A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, and MACD indicators to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.
+A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, MACD indicators, and Dark Flow institutional analysis to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
@@ -31,6 +31,7 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 - **Stock Scanner** - Momentum stocks using the 5 Pillars methodology
 - **FOREX Scanner** - Top 10 major currency pairs (24/5 trading)
 - **Crypto Scanner** - Top 20 active cryptocurrencies (24/7 trading)
+- **Dark Flow Scanner** - Institutional volume profile analysis (NEW in v0.93)
 
 ### Stock Scanner (NEW 5 Pillars - v0.93)
 - Scans NASDAQ, NYSE, or all US markets
@@ -65,8 +66,27 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 - Activity scoring based on volume and volatility
 - 24/7 market coverage
 
+### Dark Flow Scanner (NEW in v0.93)
+- **Institutional volume profile analysis**
+- Detects key price levels where institutions are active
+- Identifies volume clusters (dark pool activity)
+- Finds unusual volume spikes
+- Detects price gaps and their significance
+- **Works with stocks and major ETFs** (SPY, QQQ, IWM, DIA)
+- Shows support/resistance levels based on institutional activity
+- Provides bullish/bearish bias based on volume distribution
+
+**Dark Flow Features:**
+- Volume profile analysis with 20 price bins
+- Key institutional levels ranked by trading activity
+- Unusual volume detection (2+ standard deviations)
+- Price gap identification and classification
+- Active level alerts (within 0.5% of current price)
+- Optimized for major ETFs where institutional activity is highest
+
 ### Technical Analysis
 - **VWAP (Volume Weighted Average Price)** with 1σ and 2σ bands
+- **SMA + ATR** bands for FOREX/crypto (when volume data unavailable)
 - **MACD** (Moving Average Convergence Divergence) with crossover detection
 - **Automatic entry/exit point calculation**
 - **Risk/Reward ratio optimization** (default 3:1, customizable)
@@ -141,24 +161,31 @@ python trading_signal_analyzer.py
 - Activity-based ranking
 - 24/7 trading opportunities
 
-**4. Analyze from Last Scan**
+**4. Dark Flow Scanner (institutional levels)**
+- Analyze volume profile for institutional activity
+- Scan major ETFs (SPY, QQQ, IWM, DIA) or custom tickers
+- Identify key support/resistance from volume clusters
+- Detect unusual volume and price gaps
+- See where "smart money" is active
+
+**5. Analyze from Last Scan**
 - Reuse previous scan results
 - Quick analysis without rescanning
 - Works with stocks, FOREX, or crypto
 
-**5. Enter Ticker Manually**
+**6. Enter Ticker Manually**
 - Analyze specific assets
 - Supports stocks, FOREX, and crypto
 - Comma-separated for multiple tickers
 
-**6. Change Risk/Reward Ratio**
+**7. Change Risk/Reward Ratio**
 - Adjust profit targets
 - Common ratios: 2:1, 3:1, 5:1
 
-**7. Change Timeframe**
+**8. Change Timeframe**
 - Switch between scalping/intraday/short/medium/long-term analysis
 
-**8. Quit**
+**9. Quit**
 - Clean exit with final disclaimer
 
 ---
@@ -201,6 +228,41 @@ python trading_signal_analyzer.py
    3:1 ratio is appropriate
 ```
 
+### Dark Flow Scanner Output
+```
+🌊 DARK FLOW ANALYSIS: SPY
+════════════════════════════════════════════════════════════════════════════════
+
+💰 CURRENT PRICE: $485.23
+📊 TODAY'S OPEN: $482.10
+📈 TODAY'S RANGE: $481.50 - $486.75
+
+🟢 BIAS: BULLISH
+
+🎯 KEY INSTITUTIONAL LEVELS (Volume Clusters):
+   1. $485.50 (+0.06%) ⭐ ACTIVE
+   2. $483.20 (-0.42%) ⬇️  SUPPORT
+   3. $487.30 (+0.43%) ⬆️  RESISTANCE
+   4. $481.80 (-0.71%) ⬇️  SUPPORT
+   5. $488.90 (+0.76%) ⬆️  RESISTANCE
+
+🌊 DARK FLOW SIGNALS:
+   • VOLUME_CLUSTER at $485.50
+
+📊 UNUSUAL VOLUME ACTIVITY:
+   • 2024-11-15 10:30: $484.50 - 3.2x avg
+   • 2024-11-15 13:15: $485.80 - 2.8x avg
+
+⚡ PRICE GAPS:
+   • UP: $482.10 → $483.45 (1.28%)
+
+⭐ MAJOR ETF - Prime candidate for signature prints
+
+════════════════════════════════════════════════════════════════════════════════
+💡 Volume clusters show institutional accumulation/distribution levels
+════════════════════════════════════════════════════════════════════════════════
+```
+
 ### FOREX Scanner Output
 ```
 💱 FOREX PAIRS - TOP 10 MAJOR PAIRS
@@ -241,13 +303,42 @@ This software implements the "5 Pillars of Day Trading" methodology for stock se
 - Educational resources on day trading strategies
 - Technical analysis fundamentals
 
+### Dark Flow Scanner Methodology
+The Dark Flow Scanner uses **volume profile analysis** to detect institutional activity:
+
+**How It Works:**
+1. **Volume Profile Creation** - Divides price range into 20 bins and aggregates volume at each level
+2. **Key Level Identification** - Finds price levels with highest trading activity (institutional accumulation/distribution)
+3. **Unusual Volume Detection** - Identifies volume spikes 2+ standard deviations above average
+4. **Gap Analysis** - Detects price gaps over 1% and classifies them
+5. **Bias Determination** - Calculates bullish/bearish bias from price vs. open
+
+**Use Cases:**
+- Identify where institutions are building positions (support levels)
+- Find resistance where institutions may be distributing (selling)
+- Spot "signature prints" - large block orders in major ETFs
+- Confirm technical analysis with volume validation
+- Find optimal entry points near institutional levels
+
+**Best Practices:**
+- Focus on major ETFs (SPY, QQQ, IWM, DIA) for clearest signals
+- Volume clusters within 0.5% of current price are most actionable
+- Combine with VWAP/MACD analysis for highest-probability setups
+- Unusual volume often precedes major price moves
+
 ### Technical Analysis
-The technical analysis implementation (VWAP, MACD) is original work by the author:
+The technical analysis implementation (VWAP, MACD, SMA+ATR) is original work by the author:
 
 **VWAP Bands:**
 - VWAP = Volume Weighted Average Price
 - Standard deviation bands show support/resistance
 - Price position indicates overbought/oversold conditions
+
+**SMA + ATR Bands:**
+- Used for FOREX/crypto when volume data unavailable
+- 20-period Simple Moving Average
+- ATR-based bands (1x and 2x ATR)
+- Automatically detected and applied
 
 **MACD:**
 - 12/26/9 default settings
@@ -347,6 +438,12 @@ See the [LICENSE](LICENSE) file for full details.
 - [Babypips FOREX School](https://www.babypips.com/learn/forex) (for FOREX)
 - [CoinMarketCap Learn](https://coinmarketcap.com/alexandria) (for crypto)
 
+### Dark Flow & Volume Profile
+- Volume profile is a chartist technique for finding value areas
+- Dark pools are private exchanges where institutional orders execute
+- Volume clusters indicate areas where price may find support/resistance
+- Combine with technical analysis for confirmation
+
 ### Risk Management
 - Never risk more than 1-2% of account per trade
 - Always use stop losses
@@ -384,15 +481,22 @@ pip install tradingview-screener
 - Adjust timeframe
 - Check internet connection
 
+**Dark Flow Scanner Issues**
+- Works best with liquid assets (stocks with high volume)
+- Major ETFs (SPY, QQQ, IWM, DIA) provide clearest signals
+- Requires at least 10 data points for volume profile
+- Some assets may have insufficient historical data
+
 **Rate Limiting**
 - Yahoo Finance may throttle requests
 - Wait a few minutes between large scans
-- Use scanner results multiple times (option 4)
+- Use scanner results multiple times (option 5)
 
 **FOREX/Crypto Data Issues**
 - Some pairs may have limited historical data
 - Try different timeframes
 - Ensure correct ticker format
+- System automatically switches to SMA+ATR when volume unavailable
 
 ---
 
@@ -415,12 +519,14 @@ pip install tradingview-screener
 - ✅ Dark Flow Scanner (institutional levels)
 - ✅ 5 timeframe options
 - ✅ VWAP + MACD analysis
+- ✅ SMA + ATR for FOREX/crypto
 
 **Planned Features (v0.94+):**
 - [ ] RSI and Bollinger Bands indicators
 - [ ] Export analysis to CSV/PDF
 - [ ] Trade journaling/logging
 - [ ] Enhanced pattern recognition
+- [ ] Dark Flow alerts for level breaks
 
 **Planned for v1.0:**
 - [ ] Backtesting engine
@@ -437,6 +543,7 @@ pip install tradingview-screener
 - [ ] Advanced charting integration
 - [ ] Machine learning price predictions
 - [ ] Options trading support
+- [ ] Dark Flow pattern recognition (signature print detection)
 
 ---
 
@@ -457,6 +564,8 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history and release notes.
 - **Low float indicators** - Squeeze potential detection
 - **Catalyst strength classification** - STRONG/MODERATE/PRESENT
 - **Improved scanner display** - Sorted by best setups first
+- **Dark Flow Scanner** - Institutional volume profile analysis
+- **SMA + ATR bands** - For FOREX/crypto without volume data
 
 ---
 
@@ -471,6 +580,13 @@ This program is distributed in the hope that it will be useful, but **WITHOUT AN
 ---
 
 ## ⚠️ Important Notes
+
+### Dark Flow Trading
+- Volume clusters indicate institutional activity areas
+- High volume at price level = strong support/resistance
+- Unusual volume spikes often precede significant moves
+- Major ETFs (SPY, QQQ) show clearest institutional patterns
+- Always confirm with technical analysis (VWAP/MACD)
 
 ### FOREX Trading
 - FOREX markets are highly leveraged
