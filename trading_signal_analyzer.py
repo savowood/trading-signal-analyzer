@@ -1,6 +1,8 @@
 """
-Trading Signal Analyzer v0.91 - Entry/Exit Point Prediction
+Trading Signal Analyzer v0.93 - Entry/Exit Point Prediction  
 Copyright (C) 2025 Michael Johnson (GitHub: @savowood)
+
+FULLY INTEGRATED VERSION with Enhanced Dark Flow Market Scanner
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -31,7 +33,7 @@ NEW 5 PILLARS:
 Original research inspired by momentum trading strategies.
 Learn more at: https://www.warriortrading.com/
 
-Technical analysis (VWAP, MACD, Dark Flow Scanner) implementation is original work.
+Technical analysis (VWAP, MACD, Enhanced Dark Flow Scanner) implementation is original work.
 
 ================================================================================
 FINANCIAL DISCLAIMER
@@ -62,7 +64,7 @@ USE AT YOUR OWN RISK.
 Version: 0.93
 NEW 5 PILLARS: +10% Day, 5x RelVol, News Catalyst, $2-$20, <20M Float
 Uses VWAP bands (1σ, 2σ) + MACD for optimal entry/exit points
-Includes integrated 5 Pillars Scanner + FOREX + Crypto + Dark Flow
+Includes integrated 5 Pillars Scanner + FOREX + Crypto + ENHANCED Dark Flow Market Scanner
 """
 
 import yfinance as yf
@@ -141,34 +143,25 @@ def is_likely_delisted(ticker: str, price: float, volume: int, market_cap: float
     Returns:
         True if stock appears delisted/inactive
     """
-    # Delisting indicators:
-    # 1. Extremely low price (< $0.0001) with no volume
-    # 2. Zero or near-zero volume for extended period
-    # 3. Market cap extremely low or zero
-    # 4. Ticker ends with common delisting suffixes
+    delisting_suffixes = ['Q', 'E', 'D']
     
-    delisting_suffixes = ['Q', 'E', 'D']  # Bankruptcy, delinquent, new issue, etc.
-    
-    # Check for delisting suffix
     if any(ticker.endswith(suffix) for suffix in delisting_suffixes):
         return True
     
-    # Extremely low price with no volume
     if price < 0.0001 and volume < 1000:
         return True
     
-    # Zero volume (completely inactive)
     if volume == 0:
         return True
     
-    # Market cap suspicious (too small or zero)
-    if market_cap and market_cap < 100000:  # Under $100k market cap
+    if market_cap and market_cap < 100000:
         return True
     
     return False
 
 
-def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_price: float = 20.0) -> List[Dict]:
+def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, 
+                        max_price: float = 20.0) -> List[Dict]:
     """
     Integrated 5 Pillars Momentum Scanner
     
@@ -195,7 +188,6 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
         print("🔍 Scanning for momentum setups...")
         print(f"   Filters: ${min_price:.2f} - ${max_price:.2f}, 5x+ RelVol, +10% day, <20M float")
         
-        # Build query
         q = Query()
         
         if market_choice == '3':
@@ -205,20 +197,17 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
         else:
             q = q.set_markets('america')
         
-        # Apply NEW 5 pillars filters
-        q = q.where(col('close').between(min_price, max_price))  # Pillar 4: Price range
-        q = q.where(col('relative_volume_10d_calc') >= 5.0)  # Pillar 2: 5x relative volume (500%)
-        q = q.where(col('change_from_open') >= 10.0)  # Pillar 1: Up 10%+ today
+        q = q.where(col('close').between(min_price, max_price))
+        q = q.where(col('relative_volume_10d_calc') >= 5.0)
+        q = q.where(col('change_from_open') >= 10.0)
         
-        # Select fields
         q = q.select(
             'name', 'close', 'volume', 'relative_volume_10d_calc',
             'market_cap_basic', 'change', 'change_from_open',
             'Recommend.All', 'Perf.W', 'Perf.1M',
             'average_volume_10d_calc', 'exchange', 'description'
-        ).order_by('change_from_open', ascending=False).limit(100)  # Sort by biggest movers
+        ).order_by('change_from_open', ascending=False).limit(100)
         
-        # Execute
         count, df = q.get_scanner_data()
         
         if df is None or df.empty:
@@ -237,25 +226,17 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
                 perf_1m = float(row.get('Perf.1M') or 0)
                 description = row.get('description', '')
                 
-                # Calculate float (shares available to trade)
-                # Float = Market Cap / Price / 1M (to get millions of shares)
                 if market_cap and price > 0:
                     float_m = (market_cap / price) / 1_000_000
                 else:
-                    float_m = 50  # Default estimate
+                    float_m = 50
                 
-                # Pillar 5: Under 20M float
                 low_float = float_m < 20
-                
-                # Pillar 3: News event/catalyst detection (simplified)
-                # Strong intraday move + high volume suggests news
                 has_catalyst = (change_from_open >= 10) and (rel_vol >= 5.0)
                 
-                # Additional news indicators
-                strong_week = abs(change_pct) > 20  # Big weekly move
-                explosive_month = perf_1m > 50  # Major monthly move
+                strong_week = abs(change_pct) > 20
+                explosive_month = perf_1m > 50
                 
-                # Enhanced catalyst score
                 if strong_week or explosive_month:
                     catalyst_strength = "STRONG"
                 elif change_from_open >= 15:
@@ -263,21 +244,18 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
                 else:
                     catalyst_strength = "PRESENT"
                 
-                # Score NEW 5 pillars
                 pillars_met = sum([
-                    change_from_open >= 10,  # Pillar 1: Up 10%+ today
-                    rel_vol >= 5.0,          # Pillar 2: 5x relative volume
-                    has_catalyst,             # Pillar 3: News/catalyst
-                    True,                     # Pillar 4: Price already filtered
-                    low_float                 # Pillar 5: Under 20M float
+                    change_from_open >= 10,
+                    rel_vol >= 5.0,
+                    has_catalyst,
+                    True,
+                    low_float
                 ])
                 
-                # Check if likely delisted
                 volume_val = row.get('volume', 0) or 0
                 if is_likely_delisted(ticker, price, volume_val, market_cap):
-                    continue  # Skip delisted stocks
+                    continue
                 
-                # Only include stocks meeting at least 3 of 5 pillars
                 if pillars_met >= 3:
                     results.append({
                         'Ticker': ticker,
@@ -294,7 +272,6 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
             except:
                 continue
         
-        # Sort by score first, then by today's % change
         results.sort(key=lambda x: (x['Score'], x['Today%']), reverse=True)
         
         print(f"✅ Found {len(results)} qualifying stocks")
@@ -306,21 +283,10 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, max_p
 
 
 def scan_forex_pairs() -> List[Dict]:
-    """
-    Scan top 10 FOREX pairs for trading opportunities
-    
-    Focuses on major and minor pairs with high liquidity:
-    - EUR/USD, GBP/USD, USD/JPY, USD/CHF (majors)
-    - AUD/USD, NZD/USD, USD/CAD (commodity currencies)
-    - EUR/GBP, EUR/JPY, GBP/JPY (crosses)
-    
-    Returns:
-        List of FOREX pairs with current data
-    """
+    """Scan top 10 FOREX pairs for trading opportunities"""
     try:
         print("🔍 Scanning top FOREX pairs...")
         
-        # Top 10 FOREX pairs (Yahoo Finance format)
         forex_pairs = [
             ('EURUSD=X', 'EUR/USD', 'Euro / US Dollar'),
             ('GBPUSD=X', 'GBP/USD', 'British Pound / US Dollar'),
@@ -338,7 +304,6 @@ def scan_forex_pairs() -> List[Dict]:
         
         for ticker, symbol, name in forex_pairs:
             try:
-                # Get recent data
                 forex = yf.Ticker(ticker)
                 hist = forex.history(period='5d', interval='1h')
                 
@@ -349,15 +314,12 @@ def scan_forex_pairs() -> List[Dict]:
                 prev_price = hist['Close'].iloc[-2]
                 day_change = ((current_price - prev_price) / prev_price) * 100
                 
-                # Calculate week change
                 week_ago_price = hist['Close'].iloc[0]
                 week_change = ((current_price - week_ago_price) / week_ago_price) * 100
                 
-                # Calculate average volume (for activity measure)
                 avg_volume = hist['Volume'].mean() if 'Volume' in hist.columns else 0
                 recent_volume = hist['Volume'].iloc[-1] if 'Volume' in hist.columns else 0
                 
-                # Volatility (price range over period)
                 price_range = hist['High'].max() - hist['Low'].min()
                 volatility_pct = (price_range / current_price) * 100
                 
@@ -373,10 +335,8 @@ def scan_forex_pairs() -> List[Dict]:
                 })
                 
             except Exception as e:
-                print(f"⚠️  Could not fetch {symbol}: {e}")
                 continue
         
-        # Sort by absolute week change (most active)
         results.sort(key=lambda x: abs(x['Week%']), reverse=True)
         
         print(f"✅ Found {len(results)} FOREX pairs")
@@ -388,19 +348,10 @@ def scan_forex_pairs() -> List[Dict]:
 
 
 def scan_crypto() -> List[Dict]:
-    """
-    Scan top 20 highly active cryptocurrencies
-    
-    Includes major cryptocurrencies with high trading volume:
-    - BTC, ETH, BNB, SOL, XRP, ADA, DOGE, etc.
-    
-    Returns:
-        List of cryptocurrencies with current data
-    """
+    """Scan top 20 highly active cryptocurrencies"""
     try:
         print("🔍 Scanning top cryptocurrencies...")
         
-        # Top 20 cryptocurrencies (Yahoo Finance format)
         crypto_tickers = [
             ('BTC-USD', 'Bitcoin'),
             ('ETH-USD', 'Ethereum'),
@@ -428,7 +379,6 @@ def scan_crypto() -> List[Dict]:
         
         for ticker, name in crypto_tickers:
             try:
-                # Get recent data
                 crypto = yf.Ticker(ticker)
                 hist = crypto.history(period='5d', interval='1h')
                 
@@ -437,29 +387,23 @@ def scan_crypto() -> List[Dict]:
                 
                 current_price = hist['Close'].iloc[-1]
                 
-                # Calculate changes
                 prev_price = hist['Close'].iloc[-2]
                 hour_change = ((current_price - prev_price) / prev_price) * 100
                 
-                # Week change
                 week_ago_price = hist['Close'].iloc[0]
                 week_change = ((current_price - week_ago_price) / week_ago_price) * 100
                 
-                # Day change (last 24 hours)
                 if len(hist) >= 24:
                     day_ago_price = hist['Close'].iloc[-24]
                     day_change = ((current_price - day_ago_price) / day_ago_price) * 100
                 else:
                     day_change = hour_change
                 
-                # Volume (24h)
                 volume_24h = hist['Volume'].iloc[-24:].sum() if len(hist) >= 24 else hist['Volume'].sum()
                 
-                # Volatility
                 price_range = hist['High'].max() - hist['Low'].min()
                 volatility_pct = (price_range / current_price) * 100
                 
-                # Activity score (combination of volume and volatility)
                 activity_score = abs(week_change) * (volatility_pct / 10)
                 
                 results.append({
@@ -475,10 +419,8 @@ def scan_crypto() -> List[Dict]:
                 })
                 
             except Exception as e:
-                print(f"⚠️  Could not fetch {name}: {e}")
                 continue
         
-        # Sort by activity score (most active)
         results.sort(key=lambda x: x['Activity'], reverse=True)
         
         print(f"✅ Found {len(results)} active cryptocurrencies")
@@ -505,7 +447,6 @@ def display_forex_pairs(pairs: List[Dict]):
     for idx, pair in enumerate(pairs, 1):
         change_emoji = "🟢" if pair['Change%'] >= 0 else "🔴"
         
-        # Format price appropriately
         price = pair['Price']
         if price < 1:
             price_str = f"{price:.5f}"
@@ -535,7 +476,6 @@ def display_crypto(cryptos: List[Dict]):
     print("-" * 95)
     
     for idx, crypto in enumerate(cryptos, 1):
-        # Emoji based on day change
         if crypto['Day%'] >= 5:
             emoji = "🚀"
         elif crypto['Day%'] >= 0:
@@ -545,7 +485,6 @@ def display_crypto(cryptos: List[Dict]):
         else:
             emoji = "📉"
         
-        # Format price appropriately
         price = crypto['Price']
         if price < 0.01:
             price_str = f"${price:.6f}"
@@ -592,7 +531,6 @@ def choose_from_scan(scanned_items: List[Dict], asset_type: str = "stocks") -> L
     elif choice == 'top10':
         return [s['Ticker'] for s in scanned_items[:10]]
     else:
-        # Parse numbers
         try:
             indices = [int(x.strip()) for x in choice.split(',')]
             tickers = []
@@ -623,14 +561,12 @@ def display_scanned_stocks(stocks: List[Dict]):
     for idx, stock in enumerate(stocks, 1):
         score_emoji = "🔥🔥🔥" if stock['Score'] >= 5 else "🔥🔥" if stock['Score'] >= 4 else "🔥"
         
-        # Format price
         price = stock['Price']
         if price < 1.00:
             price_str = f"${price:.3f}"
         else:
             price_str = f"${price:.2f}"
         
-        # Float indicator
         float_indicator = "⭐" if stock.get('LowFloat', False) else ""
         
         print(f"{idx:<4} {stock['Ticker']:<8} {price_str:<10} {stock['Score']}/5 {score_emoji:<4} "
@@ -650,37 +586,17 @@ class TechnicalAnalyzer:
         self.risk_reward_ratio = risk_reward_ratio
     
     def has_volume_data(self, df: pd.DataFrame) -> bool:
-        """
-        Check if DataFrame has valid volume data
-        
-        Args:
-            df: DataFrame with market data
-            
-        Returns:
-            True if volume data is valid
-        """
+        """Check if DataFrame has valid volume data"""
         if 'Volume' not in df.columns:
             return False
         
-        # Check if volume is all zeros or NaN
         volume_sum = df['Volume'].sum()
         return volume_sum > 0 and not pd.isna(volume_sum)
     
     def calculate_sma_atr_bands(self, df: pd.DataFrame, period: int = 20) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series]:
-        """
-        Calculate SMA with ATR-based bands (for assets without volume like FOREX)
-        
-        Args:
-            df: DataFrame with OHLC data
-            period: SMA period (default 20)
-            
-        Returns:
-            Tuple of (sma, upper_1atr, lower_1atr, upper_2atr, lower_2atr)
-        """
-        # Simple Moving Average
+        """Calculate SMA with ATR-based bands (for assets without volume like FOREX)"""
         sma = df['Close'].rolling(window=period).mean()
         
-        # Calculate ATR (Average True Range)
         high_low = df['High'] - df['Low']
         high_close = np.abs(df['High'] - df['Close'].shift())
         low_close = np.abs(df['Low'] - df['Close'].shift())
@@ -688,7 +604,6 @@ class TechnicalAnalyzer:
         true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
         atr = true_range.rolling(window=14).mean()
         
-        # Create bands using ATR
         upper_1atr = sma + atr
         lower_1atr = sma - atr
         upper_2atr = sma + (2 * atr)
@@ -697,33 +612,15 @@ class TechnicalAnalyzer:
         return sma, upper_1atr, lower_1atr, upper_2atr, lower_2atr
         
     def calculate_vwap(self, df: pd.DataFrame) -> pd.Series:
-        """
-        Calculate Volume Weighted Average Price
-        
-        Args:
-            df: DataFrame with OHLCV data
-            
-        Returns:
-            Series with VWAP values
-        """
+        """Calculate Volume Weighted Average Price"""
         typical_price = (df['High'] + df['Low'] + df['Close']) / 3
         vwap = (typical_price * df['Volume']).cumsum() / df['Volume'].cumsum()
         return vwap
     
     def calculate_vwap_bands(self, df: pd.DataFrame, vwap: pd.Series) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
-        """
-        Calculate VWAP standard deviation bands
-        
-        Args:
-            df: DataFrame with OHLCV data
-            vwap: VWAP series
-            
-        Returns:
-            Tuple of (upper_1std, lower_1std, upper_2std, lower_2std)
-        """
+        """Calculate VWAP standard deviation bands"""
         typical_price = (df['High'] + df['Low'] + df['Close']) / 3
         
-        # Calculate rolling standard deviation of price from VWAP
         squared_diff = (typical_price - vwap) ** 2
         weighted_squared_diff = squared_diff * df['Volume']
         variance = weighted_squared_diff.cumsum() / df['Volume'].cumsum()
@@ -737,18 +634,7 @@ class TechnicalAnalyzer:
         return upper_1std, lower_1std, upper_2std, lower_2std
     
     def calculate_macd(self, df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """
-        Calculate MACD indicator
-        
-        Args:
-            df: DataFrame with price data
-            fast: Fast EMA period (default 12)
-            slow: Slow EMA period (default 26)
-            signal: Signal line period (default 9)
-            
-        Returns:
-            Tuple of (macd_line, signal_line, histogram)
-        """
+        """Calculate MACD indicator"""
         ema_fast = df['Close'].ewm(span=fast, adjust=False).mean()
         ema_slow = df['Close'].ewm(span=slow, adjust=False).mean()
         macd_line = ema_fast - ema_slow
@@ -758,33 +644,19 @@ class TechnicalAnalyzer:
         return macd_line, signal_line, histogram
     
     def analyze_stock(self, ticker: str, period: str = "5d", interval: str = "5m") -> Optional[Dict]:
-        """
-        Perform complete technical analysis on a stock/forex/crypto
-        
-        Args:
-            ticker: Ticker symbol (stock, FOREX=X, crypto-USD)
-            period: Time period (1d, 5d, 1mo, etc.)
-            interval: Data interval (1m, 5m, 15m, 1h, 1d)
-            
-        Returns:
-            Dictionary with analysis results or None if failed
-        """
+        """Perform complete technical analysis on a stock/forex/crypto"""
         try:
-            # Download data
             stock = yf.Ticker(ticker)
             df = stock.history(period=period, interval=interval)
             
-            if df.empty or len(df) < 26:  # Need at least 26 periods for MACD
+            if df.empty or len(df) < 26:
                 return None
             
-            # Calculate indicators
             current_price = df['Close'].iloc[-1]
             
-            # Check if we have volume data (stocks vs FOREX/crypto)
             has_volume = self.has_volume_data(df)
             
             if has_volume:
-                # Use VWAP for stocks with volume
                 vwap = self.calculate_vwap(df)
                 upper_1std, lower_1std, upper_2std, lower_2std = self.calculate_vwap_bands(df, vwap)
                 
@@ -795,7 +667,6 @@ class TechnicalAnalyzer:
                 current_lower_2std = lower_2std.iloc[-1]
                 indicator_type = "VWAP"
             else:
-                # Use SMA + ATR for FOREX/crypto without volume
                 sma, upper_1atr, lower_1atr, upper_2atr, lower_2atr = self.calculate_sma_atr_bands(df)
                 
                 current_vwap = sma.iloc[-1]
@@ -805,29 +676,23 @@ class TechnicalAnalyzer:
                 current_lower_2std = lower_2atr.iloc[-1]
                 indicator_type = "SMA"
             
-            # Calculate MACD (works for all assets)
             macd_line, signal_line, histogram = self.calculate_macd(df)
             
-            # Current MACD values
             current_macd = macd_line.iloc[-1]
             current_signal = signal_line.iloc[-1]
             current_histogram = histogram.iloc[-1]
             
-            # Previous values for trend
             prev_macd = macd_line.iloc[-2] if len(macd_line) > 1 else current_macd
             prev_signal = signal_line.iloc[-2] if len(signal_line) > 1 else current_signal
             prev_histogram = histogram.iloc[-2] if len(histogram) > 1 else current_histogram
             
-            # Determine position relative to center line (VWAP or SMA)
             price_vs_vwap = ((current_price - current_vwap) / current_vwap) * 100
             
-            # MACD signals
             macd_bullish = current_macd > current_signal
             macd_crossover = (current_macd > current_signal) and (prev_macd <= prev_signal)
             macd_crossunder = (current_macd < current_signal) and (prev_macd >= prev_signal)
             histogram_increasing = current_histogram > prev_histogram
             
-            # Determine position in bands
             if current_price > current_upper_2std:
                 vwap_zone = "Above 2σ (Overbought)"
             elif current_price > current_upper_1std:
@@ -873,15 +738,7 @@ class TechnicalAnalyzer:
             return None
     
     def calculate_entry_exit(self, analysis: Dict) -> Dict:
-        """
-        Calculate optimal entry, stop loss, and take profit levels
-        
-        Args:
-            analysis: Technical analysis dictionary
-            
-        Returns:
-            Dictionary with entry/exit recommendations
-        """
+        """Calculate optimal entry, stop loss, and take profit levels"""
         current_price = analysis['current_price']
         vwap = analysis['vwap']
         lower_1std = analysis['lower_1std']
@@ -894,7 +751,6 @@ class TechnicalAnalyzer:
         macd_crossover = analysis['macd_crossover']
         histogram_increasing = analysis['histogram_increasing']
         
-        # Determine trade direction and signal strength
         if macd_crossover:
             signal_strength = "STRONG"
         elif macd_bullish and histogram_increasing:
@@ -904,38 +760,31 @@ class TechnicalAnalyzer:
         else:
             signal_strength = "BEARISH"
         
-        # Long trade logic
         if macd_bullish:
-            # Entry point suggestions
             if current_price < vwap:
-                entry_point = current_price  # Already at good entry
+                entry_point = current_price
                 if indicator_type == "SMA":
                     entry_reason = "Price below SMA - Good entry point"
                 else:
                     entry_reason = "Price below VWAP - Good entry point"
             elif current_price <= upper_1std:
-                entry_point = vwap  # Wait for pullback
+                entry_point = vwap
                 if indicator_type == "SMA":
                     entry_reason = "Wait for pullback to SMA"
                 else:
                     entry_reason = "Wait for pullback to VWAP"
             else:
-                entry_point = upper_1std  # Wait for deeper pullback
+                entry_point = upper_1std
                 entry_reason = "Price extended - wait for pullback to 1σ"
             
-            # Stop loss: Below VWAP/SMA or 1σ lower band
             if entry_point > vwap:
-                stop_loss = vwap * 0.995  # Just below center line with buffer
+                stop_loss = vwap * 0.995
             else:
-                stop_loss = lower_1std * 0.995  # Just below 1σ lower band
+                stop_loss = lower_1std * 0.995
             
-            # Risk calculation
             risk = entry_point - stop_loss
-            
-            # Take profit based on risk/reward ratio
             take_profit = entry_point + (risk * self.risk_reward_ratio)
             
-            # Check if take profit is realistic (not beyond 2σ upper)
             if take_profit > upper_2std:
                 suggested_ratio = (upper_2std - entry_point) / risk if risk > 0 else self.risk_reward_ratio
                 ratio_recommendation = f"Consider {suggested_ratio:.1f}:1 (TP at 2σ: ${upper_2std:.2f})"
@@ -944,11 +793,10 @@ class TechnicalAnalyzer:
             
             trade_direction = "LONG"
             
-        else:  # Bearish - short trade or no trade
+        else:
             entry_point = current_price
             entry_reason = "Bearish MACD - consider shorting or avoiding"
             
-            # For short trades
             if current_price > vwap:
                 stop_loss = upper_1std * 1.005
             else:
@@ -979,17 +827,7 @@ class TechnicalAnalyzer:
         }
     
     def generate_recommendation(self, ticker: str, period: str = "5d", interval: str = "5m") -> Optional[Dict]:
-        """
-        Generate complete trading recommendation
-        
-        Args:
-            ticker: Stock ticker symbol
-            period: Time period for analysis
-            interval: Data interval
-            
-        Returns:
-            Complete recommendation dictionary
-        """
+        """Generate complete trading recommendation"""
         analysis = self.analyze_stock(ticker, period, interval)
         
         if not analysis:
@@ -1009,7 +847,6 @@ def display_recommendation(rec: Dict):
     print(f"📊 TRADING ANALYSIS: {rec['ticker']}")
     print("=" * 70)
     
-    # Format price based on value (sub-penny stocks show more decimals)
     price = rec['current_price']
     if price < 0.01:
         price_format = f"${price:.6f}"
@@ -1022,10 +859,8 @@ def display_recommendation(rec: Dict):
     
     print(f"\n💰 CURRENT PRICE: {price_format}")
     
-    # Get indicator type (VWAP or SMA)
     indicator_type = rec.get('indicator_type', 'VWAP')
     
-    # Format VWAP/SMA and bands with appropriate decimals
     vwap = rec['vwap']
     if price < 0.01:
         vwap_format = f"${vwap:.6f}"
@@ -1093,11 +928,178 @@ def display_recommendation(rec: Dict):
 
 class DarkFlowScanner:
     """
-    Dark Flow Scanner - Detects institutional dark pool activity using volume profile
+    Enhanced Dark Flow Scanner - Detects institutional dark pool activity using volume profile
+    NOW INCLUDES MARKET-WIDE SCANNING CAPABILITY
     """
     
     def __init__(self):
         self.major_etfs = ['SPY', 'QQQ', 'IWM', 'DIA']
+    
+    def scan_market_for_dark_flow(self, market_choice: str = '1', min_price: float = 5.0, 
+                                   max_price: float = 100.0, min_volume: float = 1_000_000) -> List[Dict]:
+        """
+        NEW: Scan entire market for stocks with Dark Flow signals
+        
+        Looks for:
+        - Volume clusters near current price (institutional levels)
+        - Unusual volume spikes (smart money entry)
+        - Price consolidation near institutional levels
+        - Gaps being filled by institutional buying
+        
+        Args:
+            market_choice: Market selection ('1' for US, '3' NASDAQ, '4' NYSE)
+            min_price: Minimum price filter
+            max_price: Maximum price filter
+            min_volume: Minimum average daily volume
+            
+        Returns:
+            List of stocks with Dark Flow signals ranked by strength
+        """
+        if not TRADINGVIEW_AVAILABLE:
+            print("❌ TradingView screener not available")
+            return []
+        
+        try:
+            print("🌊 Scanning market for Dark Flow signals...")
+            print(f"   Filters: ${min_price:.2f}-${max_price:.2f}, {min_volume:,.0f}+ avg volume")
+            
+            q = Query()
+            
+            if market_choice == '3':
+                q = q.set_markets('america').where(col('exchange') == 'NASDAQ')
+            elif market_choice == '4':
+                q = q.set_markets('america').where(col('exchange') == 'NYSE')
+            else:
+                q = q.set_markets('america')
+            
+            q = q.where(col('close').between(min_price, max_price))
+            q = q.where(col('volume') >= min_volume)
+            q = q.where(col('change').between(-5, 15))
+            
+            q = q.select(
+                'name', 'close', 'volume', 'change', 'change_from_open',
+                'Perf.W', 'Perf.1M', 'relative_volume_10d_calc',
+                'average_volume_10d_calc', 'high', 'low', 'open'
+            ).order_by('volume', ascending=False).limit(100)
+            
+            count, df = q.get_scanner_data()
+            
+            if df is None or df.empty:
+                print("⚠️  No stocks found matching criteria")
+                return []
+            
+            print(f"   Analyzing {len(df)} candidates for Dark Flow signals...")
+            
+            results = []
+            
+            for _, row in df.iterrows():
+                try:
+                    ticker = row['name']
+                    
+                    rel_vol = float(row.get('relative_volume_10d_calc') or 0)
+                    if rel_vol < 1.5:
+                        continue
+                    
+                    analysis = self.analyze_institutional_levels(ticker, period="5d")
+                    
+                    if not analysis:
+                        continue
+                    
+                    score = self._calculate_dark_flow_score(analysis, row)
+                    
+                    if score >= 50:
+                        results.append({
+                            'Ticker': ticker,
+                            'Price': analysis['current_price'],
+                            'Score': score,
+                            'Bias': analysis['bias'],
+                            'KeyLevels': len(analysis['key_levels']),
+                            'UnusualVol': len(analysis['unusual_volume']),
+                            'Signals': len(analysis['signals']),
+                            'RelVol': rel_vol,
+                            'Change%': float(row.get('change') or 0),
+                            'Analysis': analysis
+                        })
+                    
+                except Exception as e:
+                    continue
+            
+            results.sort(key=lambda x: x['Score'], reverse=True)
+            
+            print(f"✅ Found {len(results)} stocks with Dark Flow signals")
+            return results
+            
+        except Exception as e:
+            print(f"❌ Dark Flow scan error: {e}")
+            return []
+    
+    def _calculate_dark_flow_score(self, analysis: Dict, row: pd.Series) -> float:
+        """
+        Calculate Dark Flow signal strength score (0-100)
+        
+        Scoring criteria:
+        - Active volume clusters (near current price): +30 points
+        - Unusual volume events: +20 points
+        - Bullish bias with consolidation: +20 points
+        - Key levels above/below price (squeeze setup): +15 points
+        - Gap filling by institutions: +15 points
+        """
+        score = 0.0
+        current_price = analysis['current_price']
+        
+        # 1. Active volume clusters
+        active_clusters = [s for s in analysis['signals'] if s['type'] == 'VOLUME_CLUSTER']
+        if active_clusters:
+            score += 30
+        elif analysis['key_levels']:
+            closest_level = min(analysis['key_levels'], key=lambda x: abs(x - current_price))
+            distance_pct = abs(closest_level - current_price) / current_price
+            if distance_pct < 0.02:
+                score += 20
+        
+        # 2. Unusual volume
+        unusual_vol_count = len(analysis['unusual_volume'])
+        if unusual_vol_count >= 3:
+            score += 20
+        elif unusual_vol_count >= 1:
+            score += 10
+        
+        # 3. Bullish consolidation
+        if analysis['bias'] == 'BULLISH':
+            today_range = analysis['today_high'] - analysis['today_low']
+            range_pct = today_range / current_price
+            if range_pct < 0.03:
+                score += 20
+            elif range_pct < 0.05:
+                score += 10
+        
+        # 4. Squeeze setup
+        if len(analysis['key_levels']) >= 3:
+            levels_above = [l for l in analysis['key_levels'] if l > current_price]
+            levels_below = [l for l in analysis['key_levels'] if l < current_price]
+            
+            if levels_above and levels_below:
+                nearest_resistance = min(levels_above)
+                nearest_support = max(levels_below)
+                squeeze_range = nearest_resistance - nearest_support
+                squeeze_pct = squeeze_range / current_price
+                
+                if squeeze_pct < 0.05:
+                    score += 15
+                elif squeeze_pct < 0.10:
+                    score += 8
+        
+        # 5. Gap filling
+        if analysis['gaps']:
+            recent_gap = analysis['gaps'][-1]
+            gap_direction = recent_gap['direction']
+            
+            if gap_direction == 'DOWN' and analysis['bias'] == 'BULLISH':
+                score += 15
+            elif gap_direction == 'UP' and analysis['bias'] == 'BULLISH':
+                score += 8
+        
+        return min(score, 100)
         
     def analyze_institutional_levels(self, ticker: str, period: str = "5d") -> Optional[Dict]:
         """Analyze volume profile to detect institutional activity levels"""
@@ -1113,11 +1115,9 @@ class DarkFlowScanner:
             today_high = df['High'].tail(24).max() if len(df) >= 24 else df['High'].max()
             today_low = df['Low'].tail(24).min() if len(df) >= 24 else df['Low'].min()
             
-            # Create volume profile
             volume_profile = self._create_volume_profile(df)
             key_levels = self._find_key_levels(volume_profile, current_price)
             
-            # Detect signals
             signals = []
             for level in key_levels[:3]:
                 if abs(current_price - level) / current_price < 0.005:
@@ -1148,7 +1148,6 @@ class DarkFlowScanner:
                 'is_major_etf': ticker in self.major_etfs
             }
         except Exception as e:
-            print(f"⚠️  Error analyzing {ticker}: {e}")
             return None
     
     def _create_volume_profile(self, df: pd.DataFrame, bins: int = 20) -> pd.DataFrame:
@@ -1215,8 +1214,47 @@ class DarkFlowScanner:
         return gaps
 
 
+def display_dark_flow_scan_results(results: List[Dict]):
+    """NEW: Display Dark Flow market scan results"""
+    print("\n" + "=" * 100)
+    print("🌊 DARK FLOW SCANNER - MARKET-WIDE RESULTS")
+    print("=" * 100)
+    print("\nStocks with institutional accumulation patterns:")
+    print("=" * 100)
+    
+    if not results:
+        print("No Dark Flow signals found")
+        return
+    
+    print(f"\n{'#':<4} {'Ticker':<8} {'Price':<10} {'Score':<7} {'Bias':<10} "
+          f"{'Signals':<9} {'RelVol':<8} {'Change%':<9}")
+    print("-" * 100)
+    
+    for idx, stock in enumerate(results, 1):
+        bias_emoji = "🟢" if stock['Bias'] == "BULLISH" else "🔴"
+        
+        if stock['Score'] >= 80:
+            score_emoji = "🔥🔥🔥"
+        elif stock['Score'] >= 60:
+            score_emoji = "🔥🔥"
+        else:
+            score_emoji = "🔥"
+        
+        price_str = f"${stock['Price']:.2f}"
+        
+        print(f"{idx:<4} {stock['Ticker']:<8} {price_str:<10} "
+              f"{stock['Score']}/100 {score_emoji:<4} {bias_emoji} {stock['Bias']:<8} "
+              f"{stock['Signals']:<9} {stock['RelVol']:<7.1f}x {stock['Change%']:>+7.2f}%")
+    
+    print("-" * 100)
+    print("\n🔥 Score: 80+ = STRONG | 60-79 = MODERATE | 50-59 = WEAK")
+    print("💡 Signals = Volume clusters + Unusual volume + Gaps")
+    print("🌊 Dark Flow indicates institutional accumulation/distribution")
+    print("=" * 100)
+
+
 def display_dark_flow_analysis(analysis: Dict):
-    """Display Dark Flow analysis"""
+    """Display Dark Flow analysis for individual ticker"""
     print("\n" + "=" * 80)
     print(f"🌊 DARK FLOW ANALYSIS: {analysis['ticker']}")
     print("=" * 80)
@@ -1263,26 +1301,26 @@ def display_dark_flow_analysis(analysis: Dict):
 
 def main():
     """Main application"""
-    # Show version and disclaimer
     print("=" * 80)
     print(f"TRADING SIGNAL ANALYZER v{VERSION}")
     print("Entry/Exit Point Predictor using VWAP + MACD")
+    print("WITH ENHANCED DARK FLOW MARKET SCANNER")
     print("=" * 80)
     print(f"Author: {AUTHOR}")
     print(f"License: {LICENSE}")
     print(f"Based on the 5 Pillars of Day Trading methodology")
     print("=" * 80)
     
-    # Show disclaimer and require acceptance
     show_disclaimer()
     
     print("=" * 80)
     print("TRADING SIGNAL ANALYZER - Entry/Exit Point Predictor")
     print("=" * 80)
     print("\nUses VWAP bands (1σ, 2σ) + MACD for optimal entry/exit points")
+    print("Enhanced Dark Flow Scanner with Market-Wide Scanning")
     print("=" * 80)
     
-    # Get risk/reward ratio (persistent across session)
+    # Get risk/reward ratio
     print("\nEnter desired Risk/Reward ratio (default 3:1):")
     rr_input = input("Risk:Reward ratio (e.g., 3 for 3:1): ").strip()
     
@@ -1293,7 +1331,7 @@ def main():
     
     print(f"\n✅ Using {risk_reward}:1 Risk/Reward ratio")
     
-    # Get analysis timeframe (persistent across session)
+    # Get analysis timeframe
     print("\nSelect analysis timeframe:")
     print("1. Scalping (1 day, 1-minute intervals)")
     print("2. Intraday (5 days, 5-minute intervals)")
@@ -1321,14 +1359,14 @@ def main():
     
     print(f"\n✅ Using {timeframe_name}: {period} period with {interval} intervals")
     
-    # Initialize analyzer
     analyzer = TechnicalAnalyzer(risk_reward_ratio=risk_reward)
     
     # Store last scan results
     last_scanned_stocks = []
     last_scanned_forex = []
     last_scanned_crypto = []
-    last_scan_type = None  # Track what type of scan was last run
+    last_scanned_dark_flow = []  # NEW
+    last_scan_type = None
     
     # Main loop
     while True:
@@ -1338,7 +1376,7 @@ def main():
         print("\n1. Run Momentum Scanner (stocks)")
         print("2. Scan FOREX pairs (top 10)")
         print("3. Scan Cryptocurrencies (top 20)")
-        print("4. Dark Flow Scanner (institutional levels)")
+        print("4. Dark Flow Scanner (institutional levels + market scan)")  # UPDATED
         print("5. Analyze from last scan results")
         print("6. Enter ticker manually")
         print("7. Change risk/reward ratio")
@@ -1347,7 +1385,6 @@ def main():
         
         main_choice = input("\nEnter choice (1-9): ").strip()
         
-        # Quit
         if main_choice == '9':
             print("\n" + "=" * 80)
             print(f"TRADING SIGNAL ANALYZER v{VERSION}")
@@ -1436,7 +1473,6 @@ through use of this software.
                 print("   Install: pip install tradingview-screener")
                 continue
             
-            # Market selection
             print("\nSelect market:")
             print("1. US Stocks (NASDAQ + NYSE) - RECOMMENDED")
             print("2. NASDAQ only")
@@ -1450,7 +1486,6 @@ through use of this software.
             else:
                 market = '1'
             
-            # Price range configuration
             print("\nPrice range:")
             print("1. Default ($2.00 - $20.00) - RECOMMENDED")
             print("2. Penny stocks ($0.10 - $2.00)")
@@ -1476,11 +1511,10 @@ through use of this software.
                     print("⚠️  Invalid input, using default $2-$20")
                     min_price, max_price = 2.0, 20.0
             else:
-                min_price, max_price = 2.0, 20.0  # Default
+                min_price, max_price = 2.0, 20.0
             
             print(f"\n✅ Scanning ${min_price:.4f} - ${max_price:.2f}")
             
-            # Run scanner with price range
             scanned_stocks = scan_momentum_stocks(market, min_price, max_price)
             
             if not scanned_stocks:
@@ -1488,14 +1522,11 @@ through use of this software.
                 input("\nPress Enter to continue...")
                 continue
             
-            # Store for later use
             last_scanned_stocks = scanned_stocks
             last_scan_type = "stocks"
             
-            # Display results
             display_scanned_stocks(scanned_stocks)
             
-            # Let user choose
             tickers = choose_from_scan(scanned_stocks, "stocks")
             
             if not tickers:
@@ -1512,14 +1543,11 @@ through use of this software.
                 input("\nPress Enter to continue...")
                 continue
             
-            # Store for later use
             last_scanned_forex = scanned_forex
             last_scan_type = "forex"
             
-            # Display results
             display_forex_pairs(scanned_forex)
             
-            # Let user choose
             tickers = choose_from_scan(scanned_forex, "FOREX pairs")
             
             if not tickers:
@@ -1536,14 +1564,11 @@ through use of this software.
                 input("\nPress Enter to continue...")
                 continue
             
-            # Store for later use
             last_scanned_crypto = scanned_crypto
             last_scan_type = "crypto"
             
-            # Display results
             display_crypto(scanned_crypto)
             
-            # Let user choose
             tickers = choose_from_scan(scanned_crypto, "cryptocurrencies")
             
             if not tickers:
@@ -1551,21 +1576,90 @@ through use of this software.
                 input("\nPress Enter to continue...")
                 continue
         
-        # Dark Flow Scanner
+        # Dark Flow Scanner - ENHANCED WITH MARKET SCANNING
         elif main_choice == '4':
             print("\n" + "=" * 70)
             print("🌊 DARK FLOW SCANNER")
             print("=" * 70)
-            print("\nAnalyze institutional levels using volume profile")
+            print("\nDetect institutional accumulation patterns")
             print("\nOptions:")
             print("1. Scan major ETFs (SPY, QQQ, IWM, DIA)")
-            print("2. Enter ticker(s) manually")
+            print("2. Scan market for Dark Flow signals")  # NEW OPTION
+            print("3. Enter ticker(s) manually")
             
-            df_choice = input("\nEnter choice (1-2): ").strip()
+            df_choice = input("\nEnter choice (1-3): ").strip()
             
-            if df_choice == '1':
+            if df_choice == '2':
+                # NEW FEATURE: Market-wide Dark Flow scan
+                print("\nSelect market:")
+                print("1. US Stocks (NASDAQ + NYSE) - RECOMMENDED")
+                print("2. NASDAQ only")
+                print("3. NYSE only")
+                market_choice = input("Enter choice (1-3): ").strip()
+                
+                if market_choice == '2':
+                    market = '3'
+                elif market_choice == '3':
+                    market = '4'
+                else:
+                    market = '1'
+                
+                # Price range
+                print("\nPrice range (default $5-$100):")
+                min_input = input("Min price (or Enter for $5): ").strip()
+                max_input = input("Max price (or Enter for $100): ").strip()
+                
+                min_price = float(min_input) if min_input else 5.0
+                max_price = float(max_input) if max_input else 100.0
+                
+                # Create scanner and scan market
+                dark_flow = DarkFlowScanner()
+                results = dark_flow.scan_market_for_dark_flow(market, min_price, max_price)
+                
+                if results:
+                    # Store for later use
+                    last_scanned_dark_flow = results
+                    last_scan_type = "dark_flow"
+                    
+                    display_dark_flow_scan_results(results)
+                    
+                    # Let user select stocks for detailed analysis
+                    print("\n📋 SELECT STOCKS FOR DETAILED ANALYSIS")
+                    print("Enter numbers (e.g., 1,2,3) or 'all' or 'skip':")
+                    selection = input("Your selection: ").strip().lower()
+                    
+                    if selection and selection != 'skip':
+                        if selection == 'all':
+                            selected = results
+                        else:
+                            try:
+                                indices = [int(x.strip()) for x in selection.split(',')]
+                                selected = [results[i-1] for i in indices if 1 <= i <= len(results)]
+                            except:
+                                selected = []
+                        
+                        # Show detailed analysis for selected stocks
+                        for stock in selected:
+                            display_dark_flow_analysis(stock['Analysis'])
+                            
+                            # Ask if user wants VWAP/MACD analysis
+                            analyze_choice = input(f"\nAnalyze {stock['Ticker']} with VWAP/MACD? (y/n): ").strip().lower()
+                            if analyze_choice == 'y':
+                                rec = analyzer.generate_recommendation(stock['Ticker'], period, interval)
+                                if rec:
+                                    display_recommendation(rec)
+                            
+                            if stock != selected[-1]:
+                                input("\nPress Enter to continue...")
+                
+                input("\n📊 Press Enter to return to main menu...")
+                continue
+            
+            elif df_choice == '1':
+                # Original: Scan major ETFs
                 tickers_to_scan = ['SPY', 'QQQ', 'IWM', 'DIA']
             else:
+                # Original: Manual entry
                 ticker_input = input("\nEnter ticker(s) separated by commas: ").strip()
                 tickers_to_scan = [t.strip().upper() for t in ticker_input.split(',') if t.strip()]
             
@@ -1574,7 +1668,7 @@ through use of this software.
                 input("\nPress Enter to continue...")
                 continue
             
-            # Create scanner and analyze
+            # Create scanner and analyze tickers (original functionality)
             dark_flow = DarkFlowScanner()
             
             for ticker in tickers_to_scan:
@@ -1583,19 +1677,11 @@ through use of this software.
                     display_dark_flow_analysis(analysis)
                     
                     # Ask if user wants to analyze this ticker with VWAP/MACD
-                    if len(tickers_to_scan) > 1:
-                        analyze_choice = input(f"\nAnalyze {ticker} with VWAP/MACD? (y/n): ").strip().lower()
-                        if analyze_choice == 'y':
-                            rec = analyzer.generate_recommendation(ticker, period, interval)
-                            if rec:
-                                display_recommendation(rec)
-                    else:
-                        # Single ticker - ask at the end
-                        analyze_choice = input(f"\nAnalyze {ticker} with VWAP/MACD? (y/n): ").strip().lower()
-                        if analyze_choice == 'y':
-                            rec = analyzer.generate_recommendation(ticker, period, interval)
-                            if rec:
-                                display_recommendation(rec)
+                    analyze_choice = input(f"\nAnalyze {ticker} with VWAP/MACD? (y/n): ").strip().lower()
+                    if analyze_choice == 'y':
+                        rec = analyzer.generate_recommendation(ticker, period, interval)
+                        if rec:
+                            display_recommendation(rec)
                 
                 if len(tickers_to_scan) > 1 and ticker != tickers_to_scan[-1]:
                     input("\nPress Enter to continue to next ticker...")
@@ -1606,7 +1692,7 @@ through use of this software.
         # Analyze from last scan
         elif main_choice == '5':
             if not last_scan_type:
-                print("\n❌ No previous scan results. Run a scan first (options 1-3)")
+                print("\n❌ No previous scan results. Run a scan first (options 1-4)")
                 input("\nPress Enter to continue...")
                 continue
             
@@ -1620,6 +1706,24 @@ through use of this software.
             elif last_scan_type == "crypto":
                 display_crypto(last_scanned_crypto)
                 tickers = choose_from_scan(last_scanned_crypto, "cryptocurrencies")
+            elif last_scan_type == "dark_flow":  # NEW
+                display_dark_flow_scan_results(last_scanned_dark_flow)
+                
+                print("\n📋 SELECT STOCKS FOR ANALYSIS")
+                print("Enter numbers (e.g., 1,2,3) or 'all' or 'skip':")
+                selection = input("Your selection: ").strip().lower()
+                
+                if selection == 'all':
+                    tickers = [s['Ticker'] for s in last_scanned_dark_flow]
+                elif selection != 'skip':
+                    try:
+                        indices = [int(x.strip()) for x in selection.split(',')]
+                        tickers = [last_scanned_dark_flow[i-1]['Ticker'] for i in indices 
+                                 if 1 <= i <= len(last_scanned_dark_flow)]
+                    except:
+                        tickers = []
+                else:
+                    tickers = []
             
             if not tickers:
                 print("❌ No items selected")
@@ -1663,7 +1767,7 @@ through use of this software.
             if len(tickers) > 1 and idx < len(tickers):
                 input("\n📊 Press Enter to continue to next stock...")
         
-        # Analysis complete - ask what to do next
+        # Analysis complete
         print("\n" + "=" * 70)
         print("✅ ANALYSIS COMPLETE!")
         print("=" * 70)
