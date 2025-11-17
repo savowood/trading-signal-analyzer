@@ -2,7 +2,7 @@
 
 **Advanced Technical Analysis Tool for Day Trading - Stocks, FOREX & Crypto**
 
-A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, MACD indicators, and Dark Flow institutional analysis to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.
+A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, MACD indicators, and Dark Flow institutional analysis to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.  If you find this useful, or just feel generous, [buy me a coffee.](https://buymeacoffee.com/savowood)
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
