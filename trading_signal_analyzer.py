@@ -1,8 +1,19 @@
 """
-Trading Signal Analyzer v0.94 - Entry/Exit Point Prediction  
+Trading Signal Analyzer v0.95 - Entry/Exit Point Prediction
 Copyright (C) 2025 Michael Johnson (GitHub: @savowood)
 
 FULLY INTEGRATED VERSION with Enhanced Dark Flow Market Scanner
+
+NEW in v0.95:
+- Added RSI indicator (14-period)
+- Added SuperTrend indicator with ATR bands
+- Added volume confirmation analysis
+- Added EMA 9/20 crossover signals
+- Added multi-timeframe trend confirmation
+- Added comprehensive signal strength scoring (0-100 with grades A-D)
+- Added position sizing calculator based on risk per trade
+- Added crypto-specific parameter adjustments
+- Added CSV export for batch analysis
 
 FIXES in v0.94:
 - VWAP bands now use 2σ and 3σ (instead of 1σ and 2σ)
@@ -67,9 +78,9 @@ for your trading decisions and their consequences.
 USE AT YOUR OWN RISK.
 ================================================================================
 
-Version: 0.94
+Version: 0.95
 NEW 5 PILLARS: +10% Day, 5x RelVol, News Catalyst, $2-$20, <20M Float
-Uses VWAP bands (2σ, 3σ) + MACD for optimal entry/exit points
+Uses VWAP bands (2σ, 3σ) + MACD + RSI + SuperTrend + Signal Scoring for optimal entry/exit
 Includes integrated 5 Pillars Scanner + FOREX + Dynamic Crypto + ENHANCED Dark Flow Market Scanner
 """
 
@@ -80,10 +91,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 import warnings
 import requests
+import csv
 warnings.filterwarnings('ignore')
 
 # Version info
-VERSION = "0.94"
+VERSION = "0.95"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -732,10 +744,294 @@ class TechnicalAnalyzer:
         macd_line = ema_fast - ema_slow
         signal_line = macd_line.ewm(span=signal, adjust=False).mean()
         histogram = macd_line - signal_line
-        
+
         return macd_line, signal_line, histogram
-    
-    def analyze_stock(self, ticker: str, period: str = "5d", interval: str = "5m") -> Optional[Dict]:
+
+    def calculate_rsi(self, df: pd.DataFrame, period: int = 14) -> pd.Series:
+        """Calculate Relative Strength Index (RSI)"""
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+
+        return rsi
+
+    def calculate_supertrend(self, df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """Calculate SuperTrend indicator using ATR bands"""
+        high_low = df['High'] - df['Low']
+        high_close = np.abs(df['High'] - df['Close'].shift())
+        low_close = np.abs(df['Low'] - df['Close'].shift())
+
+        true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+        atr = true_range.rolling(window=period).mean()
+
+        hl2 = (df['High'] + df['Low']) / 2
+        upper_band = hl2 + (multiplier * atr)
+        lower_band = hl2 - (multiplier * atr)
+
+        supertrend = pd.Series(index=df.index, dtype=float)
+        direction = pd.Series(index=df.index, dtype=int)
+
+        for i in range(period, len(df)):
+            if i == period:
+                supertrend.iloc[i] = upper_band.iloc[i] if df['Close'].iloc[i] <= hl2.iloc[i] else lower_band.iloc[i]
+                direction.iloc[i] = -1 if df['Close'].iloc[i] <= hl2.iloc[i] else 1
+            else:
+                if df['Close'].iloc[i] > supertrend.iloc[i-1]:
+                    supertrend.iloc[i] = lower_band.iloc[i]
+                    direction.iloc[i] = 1
+                elif df['Close'].iloc[i] < supertrend.iloc[i-1]:
+                    supertrend.iloc[i] = upper_band.iloc[i]
+                    direction.iloc[i] = -1
+                else:
+                    supertrend.iloc[i] = supertrend.iloc[i-1]
+                    direction.iloc[i] = direction.iloc[i-1]
+
+                if direction.iloc[i] == 1 and supertrend.iloc[i] < supertrend.iloc[i-1]:
+                    supertrend.iloc[i] = supertrend.iloc[i-1]
+                elif direction.iloc[i] == -1 and supertrend.iloc[i] > supertrend.iloc[i-1]:
+                    supertrend.iloc[i] = supertrend.iloc[i-1]
+
+        return supertrend, upper_band, lower_band
+
+    def calculate_ema_cross(self, df: pd.DataFrame, fast: int = 9, slow: int = 20) -> Dict:
+        """Calculate EMA crossover signals"""
+        ema_fast = df['Close'].ewm(span=fast, adjust=False).mean()
+        ema_slow = df['Close'].ewm(span=slow, adjust=False).mean()
+
+        current_fast = ema_fast.iloc[-1]
+        current_slow = ema_slow.iloc[-1]
+        prev_fast = ema_fast.iloc[-2] if len(ema_fast) > 1 else current_fast
+        prev_slow = ema_slow.iloc[-2] if len(ema_slow) > 1 else current_slow
+
+        bullish_cross = (current_fast > current_slow) and (prev_fast <= prev_slow)
+        bearish_cross = (current_fast < current_slow) and (prev_fast >= prev_slow)
+
+        return {
+            'ema_fast': current_fast,
+            'ema_slow': current_slow,
+            'bullish': current_fast > current_slow,
+            'bullish_cross': bullish_cross,
+            'bearish_cross': bearish_cross
+        }
+
+    def check_volume_confirmation(self, df: pd.DataFrame, lookback: int = 20) -> Dict:
+        """Check if current volume confirms the move"""
+        if not self.has_volume_data(df):
+            return {'confirmed': None, 'rel_volume': 0, 'description': 'No volume data'}
+
+        current_volume = df['Volume'].iloc[-1]
+        avg_volume = df['Volume'].iloc[-lookback:].mean()
+        rel_volume = current_volume / avg_volume if avg_volume > 0 else 0
+
+        confirmed = rel_volume >= 1.5
+
+        if rel_volume >= 3.0:
+            description = "Very High Volume"
+        elif rel_volume >= 2.0:
+            description = "High Volume"
+        elif rel_volume >= 1.5:
+            description = "Above Average Volume"
+        elif rel_volume >= 0.75:
+            description = "Normal Volume"
+        else:
+            description = "Low Volume"
+
+        return {
+            'confirmed': confirmed,
+            'rel_volume': rel_volume,
+            'description': description
+        }
+
+    def check_multi_timeframe(self, ticker: str, asset_type: str = 'stock') -> Dict:
+        """Check trend across multiple timeframes for confirmation"""
+        try:
+            stock = yf.Ticker(ticker)
+
+            if asset_type == 'crypto':
+                tf_1h = stock.history(period='7d', interval='1h')
+                tf_4h = stock.history(period='30d', interval='1h')
+                tf_1d = stock.history(period='90d', interval='1d')
+            else:
+                tf_1h = stock.history(period='5d', interval='1h')
+                tf_4h = stock.history(period='1mo', interval='1d')
+                tf_1d = stock.history(period='3mo', interval='1d')
+
+            def get_trend(df_tf, period=20):
+                if df_tf.empty or len(df_tf) < period:
+                    return 'unknown'
+                ema = df_tf['Close'].ewm(span=period, adjust=False).mean()
+                current_price = df_tf['Close'].iloc[-1]
+                return 'bullish' if current_price > ema.iloc[-1] else 'bearish'
+
+            trend_1h = get_trend(tf_1h, 20)
+            trend_4h = get_trend(tf_4h, 20)
+            trend_1d = get_trend(tf_1d, 50)
+
+            bullish_count = [trend_1h, trend_4h, trend_1d].count('bullish')
+
+            if bullish_count == 3:
+                alignment = 'strong_bullish'
+            elif bullish_count == 2:
+                alignment = 'bullish'
+            elif bullish_count == 1:
+                alignment = 'bearish'
+            else:
+                alignment = 'strong_bearish'
+
+            return {
+                'trend_1h': trend_1h,
+                'trend_4h': trend_4h,
+                'trend_1d': trend_1d,
+                'alignment': alignment,
+                'bullish_timeframes': bullish_count
+            }
+        except:
+            return {
+                'trend_1h': 'unknown',
+                'trend_4h': 'unknown',
+                'trend_1d': 'unknown',
+                'alignment': 'unknown',
+                'bullish_timeframes': 0
+            }
+
+    def calculate_signal_score(self, analysis: Dict) -> Dict:
+        """Calculate comprehensive signal strength score (0-100) with letter grade"""
+        score = 0
+        factors = []
+
+        # VWAP/SMA Position (0-20 points)
+        price_vs_vwap = analysis.get('price_vs_vwap', 0)
+        if analysis.get('macd_bullish', False):
+            if -2 < price_vs_vwap < 2:
+                score += 20
+                factors.append("Perfect VWAP alignment")
+            elif -5 < price_vs_vwap < 5:
+                score += 15
+                factors.append("Good VWAP position")
+            elif price_vs_vwap < -5:
+                score += 10
+                factors.append("Below VWAP (potential entry)")
+            else:
+                score += 5
+                factors.append("Above VWAP (extended)")
+
+        # MACD Signal (0-20 points)
+        if analysis.get('macd_crossover', False):
+            score += 20
+            factors.append("MACD bullish crossover")
+        elif analysis.get('macd_bullish', False) and analysis.get('histogram_increasing', False):
+            score += 15
+            factors.append("MACD bullish & strengthening")
+        elif analysis.get('macd_bullish', False):
+            score += 10
+            factors.append("MACD bullish")
+
+        # RSI (0-15 points)
+        rsi = analysis.get('rsi', 50)
+        if 40 < rsi < 60:
+            score += 15
+            factors.append("RSI neutral (ideal for entry)")
+        elif 30 < rsi < 70:
+            score += 10
+            factors.append("RSI in normal range")
+        elif rsi < 30:
+            score += 12
+            factors.append("RSI oversold (potential bounce)")
+        else:
+            score += 5
+            factors.append("RSI overbought (caution)")
+
+        # SuperTrend (0-15 points)
+        if analysis.get('supertrend_bullish', False):
+            score += 15
+            factors.append("SuperTrend bullish")
+
+        # EMA Crossover (0-10 points)
+        ema_data = analysis.get('ema_cross', {})
+        if ema_data.get('bullish_cross', False):
+            score += 10
+            factors.append("EMA 9/20 bullish cross")
+        elif ema_data.get('bullish', False):
+            score += 7
+            factors.append("EMA 9/20 bullish")
+
+        # Volume Confirmation (0-10 points)
+        volume_data = analysis.get('volume_check', {})
+        if volume_data.get('confirmed', False):
+            score += 10
+            factors.append(f"Volume confirmed ({volume_data.get('description', '')})")
+        elif volume_data.get('rel_volume', 0) >= 1.0:
+            score += 5
+            factors.append("Average volume")
+
+        # Multi-Timeframe Alignment (0-10 points)
+        mtf = analysis.get('multi_timeframe', {})
+        alignment = mtf.get('alignment', 'unknown')
+        if alignment == 'strong_bullish':
+            score += 10
+            factors.append("All timeframes bullish")
+        elif alignment == 'bullish':
+            score += 7
+            factors.append("2/3 timeframes bullish")
+        elif alignment == 'bearish':
+            score += 3
+            factors.append("Only 1 timeframe bullish")
+
+        # Assign letter grade
+        if score >= 85:
+            grade = 'A'
+            quality = 'Excellent'
+        elif score >= 70:
+            grade = 'B'
+            quality = 'Good'
+        elif score >= 55:
+            grade = 'C'
+            quality = 'Fair'
+        elif score >= 40:
+            grade = 'D'
+            quality = 'Poor'
+        else:
+            grade = 'F'
+            quality = 'Very Poor'
+
+        return {
+            'score': score,
+            'grade': grade,
+            'quality': quality,
+            'factors': factors
+        }
+
+    def calculate_position_size(self, account_balance: float, risk_per_trade: float,
+                               entry_price: float, stop_loss: float) -> Dict:
+        """Calculate position size based on risk management"""
+        risk_amount = account_balance * (risk_per_trade / 100)
+        risk_per_share = abs(entry_price - stop_loss)
+
+        if risk_per_share == 0:
+            return {
+                'shares': 0,
+                'position_value': 0,
+                'risk_amount': risk_amount,
+                'error': 'Stop loss equals entry price'
+            }
+
+        shares = risk_amount / risk_per_share
+        position_value = shares * entry_price
+        percent_of_account = (position_value / account_balance) * 100
+
+        return {
+            'shares': int(shares),
+            'position_value': position_value,
+            'risk_amount': risk_amount,
+            'risk_per_share': risk_per_share,
+            'percent_of_account': percent_of_account
+        }
+
+    def analyze_stock(self, ticker: str, period: str = "5d", interval: str = "5m",
+                     asset_type: str = 'stock') -> Optional[Dict]:
         """Perform complete technical analysis on a stock/forex/crypto"""
         try:
             stock = yf.Ticker(ticker)
@@ -804,8 +1100,21 @@ class TechnicalAnalyzer:
                 vwap_zone = "Between 2σ and 3σ (Oversold)"
             else:
                 vwap_zone = "Below 3σ (Extremely Oversold)"
-            
-            return {
+
+            # Calculate new indicators (v0.95)
+            rsi = self.calculate_rsi(df)
+            current_rsi = rsi.iloc[-1] if len(rsi) > 0 and not pd.isna(rsi.iloc[-1]) else 50
+
+            supertrend, st_upper, st_lower = self.calculate_supertrend(df)
+            current_supertrend = supertrend.iloc[-1] if len(supertrend) > 0 and not pd.isna(supertrend.iloc[-1]) else current_price
+            supertrend_bullish = current_price > current_supertrend
+
+            ema_cross = self.calculate_ema_cross(df)
+            volume_check = self.check_volume_confirmation(df)
+            multi_timeframe = self.check_multi_timeframe(ticker, asset_type)
+
+            # Create analysis dict
+            analysis_dict = {
                 'ticker': ticker,
                 'current_price': current_price,
                 'vwap': current_vwap,
@@ -823,8 +1132,21 @@ class TechnicalAnalyzer:
                 'macd_crossover': macd_crossover,
                 'macd_crossunder': macd_crossunder,
                 'histogram_increasing': histogram_increasing,
+                'rsi': current_rsi,
+                'supertrend': current_supertrend,
+                'supertrend_bullish': supertrend_bullish,
+                'ema_cross': ema_cross,
+                'volume_check': volume_check,
+                'multi_timeframe': multi_timeframe,
+                'asset_type': asset_type,
                 'dataframe': df
             }
+
+            # Calculate signal score
+            signal_score = self.calculate_signal_score(analysis_dict)
+            analysis_dict['signal_score'] = signal_score
+
+            return analysis_dict
             
         except Exception as e:
             print(f"⚠️  Error analyzing {ticker}: {e}")
@@ -921,15 +1243,16 @@ class TechnicalAnalyzer:
             'ratio_recommendation': ratio_recommendation
         }
     
-    def generate_recommendation(self, ticker: str, period: str = "5d", interval: str = "5m") -> Optional[Dict]:
+    def generate_recommendation(self, ticker: str, period: str = "5d", interval: str = "5m",
+                               asset_type: str = 'stock') -> Optional[Dict]:
         """Generate complete trading recommendation"""
-        analysis = self.analyze_stock(ticker, period, interval)
-        
+        analysis = self.analyze_stock(ticker, period, interval, asset_type)
+
         if not analysis:
             return None
-        
+
         entry_exit = self.calculate_entry_exit(analysis)
-        
+
         return {
             **analysis,
             **entry_exit
@@ -994,12 +1317,63 @@ def display_recommendation(rec: Dict):
     print(f"   MACD Line: {rec['macd']:.4f}")
     print(f"   Signal Line: {rec['signal']:.4f}")
     print(f"   Histogram: {rec['histogram']:.4f}")
-    
+
     if rec['macd_crossover']:
         print(f"   🔥 BULLISH CROSSOVER!")
     elif rec['macd_crossunder']:
         print(f"   ❄️  BEARISH CROSSUNDER!")
-    
+
+    # Display new indicators (v0.95)
+    if 'rsi' in rec:
+        rsi = rec['rsi']
+        rsi_status = "Overbought" if rsi > 70 else "Oversold" if rsi < 30 else "Neutral"
+        print(f"\n📊 RSI(14): {rsi:.2f} ({rsi_status})")
+
+    if 'supertrend_bullish' in rec:
+        st_emoji = "🟢" if rec['supertrend_bullish'] else "🔴"
+        st_status = "Bullish" if rec['supertrend_bullish'] else "Bearish"
+        print(f"\n📊 SuperTrend: {st_emoji} {st_status}")
+        print(f"   Level: ${rec['supertrend']:.{band_decimals}f}")
+
+    if 'ema_cross' in rec:
+        ema = rec['ema_cross']
+        if ema.get('bullish_cross'):
+            print(f"\n📊 EMA 9/20: 🔥 BULLISH CROSSOVER!")
+        elif ema.get('bearish_cross'):
+            print(f"\n📊 EMA 9/20: ❄️  BEARISH CROSSUNDER!")
+        elif ema.get('bullish'):
+            print(f"\n📊 EMA 9/20: 🟢 Bullish")
+        else:
+            print(f"\n📊 EMA 9/20: 🔴 Bearish")
+
+    if 'volume_check' in rec and rec['volume_check'].get('confirmed') is not None:
+        vol = rec['volume_check']
+        vol_emoji = "✅" if vol['confirmed'] else "⚠️"
+        print(f"\n📊 Volume: {vol_emoji} {vol['description']} ({vol['rel_volume']:.2f}x avg)")
+
+    if 'multi_timeframe' in rec:
+        mtf = rec['multi_timeframe']
+        alignment = mtf.get('alignment', 'unknown')
+        if alignment == 'strong_bullish':
+            print(f"\n📊 Multi-Timeframe: 🟢🟢🟢 All timeframes bullish")
+        elif alignment == 'bullish':
+            print(f"\n📊 Multi-Timeframe: 🟢🟢 2/3 timeframes bullish")
+        elif alignment == 'bearish':
+            print(f"\n📊 Multi-Timeframe: 🟢 1/3 timeframes bullish")
+        elif alignment == 'strong_bearish':
+            print(f"\n📊 Multi-Timeframe: 🔴🔴🔴 All timeframes bearish")
+
+    if 'signal_score' in rec:
+        score_data = rec['signal_score']
+        grade = score_data['grade']
+        score = score_data['score']
+        quality = score_data['quality']
+        print(f"\n🎯 SIGNAL SCORE: {score}/100 (Grade: {grade} - {quality})")
+        if score_data.get('factors'):
+            print(f"   Key Factors:")
+            for factor in score_data['factors'][:5]:
+                print(f"   • {factor}")
+
     print(f"\n{'='*70}")
     print(f"🎯 TRADING RECOMMENDATION")
     print("=" * 70)
@@ -1020,6 +1394,94 @@ def display_recommendation(rec: Dict):
     print(f"   {rec['ratio_recommendation']}")
     
     print("\n" + "=" * 70)
+
+
+def detect_asset_type(ticker: str) -> str:
+    """Detect asset type from ticker format"""
+    ticker_upper = ticker.upper()
+
+    # FOREX pairs end with =X
+    if ticker_upper.endswith('=X'):
+        return 'forex'
+
+    # Crypto pairs typically contain -USD, -USDT, etc
+    if '-USD' in ticker_upper or '-USDT' in ticker_upper or '-BTC' in ticker_upper:
+        return 'crypto'
+
+    # Default to stock
+    return 'stock'
+
+
+def export_to_csv(recommendations: List[Dict], filename: str = None):
+    """Export analysis results to CSV file"""
+    if not recommendations:
+        print("⚠️  No data to export")
+        return
+
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"trading_signals_{timestamp}.csv"
+
+    try:
+        with open(filename, 'w', newline='') as csvfile:
+            fieldnames = [
+                'Ticker', 'Price', 'Direction', 'Signal_Score', 'Grade',
+                'RSI', 'MACD_Signal', 'SuperTrend', 'Volume_Confirmed',
+                'MTF_Alignment', 'Entry', 'Stop_Loss', 'Take_Profit',
+                'Risk_Reward', 'Position_Size_Shares'
+            ]
+
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for rec in recommendations:
+                signal_score = rec.get('signal_score', {})
+                volume_check = rec.get('volume_check', {})
+                mtf = rec.get('multi_timeframe', {})
+
+                row = {
+                    'Ticker': rec.get('ticker', 'N/A'),
+                    'Price': f"{rec.get('current_price', 0):.2f}",
+                    'Direction': rec.get('trade_direction', 'N/A'),
+                    'Signal_Score': signal_score.get('score', 0),
+                    'Grade': signal_score.get('grade', 'N/A'),
+                    'RSI': f"{rec.get('rsi', 0):.2f}",
+                    'MACD_Signal': 'Bullish' if rec.get('macd_bullish') else 'Bearish',
+                    'SuperTrend': 'Bullish' if rec.get('supertrend_bullish') else 'Bearish',
+                    'Volume_Confirmed': 'Yes' if volume_check.get('confirmed') else 'No',
+                    'MTF_Alignment': mtf.get('alignment', 'unknown'),
+                    'Entry': f"{rec.get('entry_point', 0):.2f}",
+                    'Stop_Loss': f"{rec.get('stop_loss', 0):.2f}",
+                    'Take_Profit': f"{rec.get('take_profit', 0):.2f}",
+                    'Risk_Reward': f"{rec.get('risk_reward_ratio', 0):.2f}",
+                    'Position_Size_Shares': 'N/A'
+                }
+                writer.writerow(row)
+
+        print(f"✅ Data exported to {filename}")
+        return filename
+
+    except Exception as e:
+        print(f"❌ Error exporting to CSV: {e}")
+        return None
+
+
+def calculate_batch_position_sizes(recommendations: List[Dict], account_balance: float,
+                                   risk_per_trade: float = 1.0) -> List[Dict]:
+    """Calculate position sizes for a batch of recommendations"""
+    analyzer = TechnicalAnalyzer()
+
+    for rec in recommendations:
+        entry = rec.get('entry_point', 0)
+        stop = rec.get('stop_loss', 0)
+
+        if entry > 0 and stop > 0:
+            position = analyzer.calculate_position_size(
+                account_balance, risk_per_trade, entry, stop
+            )
+            rec['position_size'] = position
+
+    return recommendations
 
 
 class DarkFlowScanner:
@@ -1399,26 +1861,28 @@ def main():
     """Main application"""
     print("=" * 80)
     print(f"TRADING SIGNAL ANALYZER v{VERSION}")
-    print("Entry/Exit Point Predictor using VWAP (2σ/3σ) + MACD")
-    print("WITH ENHANCED DARK FLOW MARKET SCANNER")
+    print("Comprehensive Technical Analysis with Signal Scoring")
     print("=" * 80)
-    print(f"Author: {AUTHOR}")
-    print(f"License: {LICENSE}")
+    print(f"Author: {AUTHOR} | License: {LICENSE}")
     print(f"Based on the 5 Pillars of Day Trading methodology")
-    print("\nFIXES in v0.94:")
-    print("  • VWAP bands now use 2σ and 3σ (instead of 1σ and 2σ)")
-    print("  • Stock scanner price filter properly enforced")
-    print("  • Cryptocurrency scanner now dynamic (CoinGecko API)")
-    print("  • Removed delisted/inactive crypto tickers")
+    print("\nNEW in v0.95:")
+    print("  ✨ RSI Indicator (14-period)")
+    print("  ✨ SuperTrend Indicator (ATR-based)")
+    print("  ✨ EMA 9/20 Crossover Signals")
+    print("  ✨ Volume Confirmation Analysis")
+    print("  ✨ Multi-Timeframe Trend Alignment")
+    print("  ✨ Signal Strength Scoring (0-100 with A-F grades)")
+    print("  ✨ Position Sizing Calculator")
+    print("  ✨ CSV Export for Batch Analysis")
     print("=" * 80)
     
     show_disclaimer()
-    
+
     print("=" * 80)
-    print("TRADING SIGNAL ANALYZER - Entry/Exit Point Predictor")
+    print("📊 TECHNICAL ANALYSIS INDICATORS")
     print("=" * 80)
-    print("\nUses VWAP bands (2σ, 3σ) + MACD for optimal entry/exit points")
-    print("Enhanced Dark Flow Scanner with Market-Wide Scanning")
+    print("VWAP (2σ/3σ) • MACD • RSI • SuperTrend • EMA 9/20")
+    print("Volume Confirmation • Multi-Timeframe Analysis • Signal Scoring")
     print("=" * 80)
     
     # Get risk/reward ratio
@@ -1472,21 +1936,33 @@ def main():
     # Main loop
     while True:
         print("\n" + "=" * 70)
-        print("MAIN MENU")
+        print(f"TRADING SIGNAL ANALYZER v{VERSION}")
         print("=" * 70)
-        print("\n1. Run Momentum Scanner (stocks)")
-        print("2. Scan FOREX pairs (top 10)")
-        print("3. Scan Cryptocurrencies (dynamic)")
-        print("4. Dark Flow Scanner (institutional levels + market scan)")
-        print("5. Analyze from last scan results")
-        print("6. Enter ticker manually")
-        print("7. Change risk/reward ratio")
-        print("8. Change timeframe")
-        print("9. Quit")
-        
-        main_choice = input("\nEnter choice (1-9): ").strip()
-        
-        if main_choice == '9':
+        print(f"Settings: {timeframe_name} ({period}/{interval}) | R:R {risk_reward}:1")
+        print(f"Analysis: VWAP • MACD • RSI • SuperTrend • EMA • Volume • MTF • Scoring")
+        print("=" * 70)
+
+        print("\n📊 SCANNERS (Find Opportunities)")
+        print("  1. Momentum Scanner - High volume stocks breaking out")
+        print("  2. FOREX Scanner - Top 10 currency pairs")
+        print("  3. Crypto Scanner - Top 30+ cryptocurrencies")
+        print("  4. Dark Flow Scanner - Institutional activity detection")
+
+        print("\n🔍 ANALYSIS (Deep Dive)")
+        print("  5. Analyze from last scan")
+        print("  6. Enter ticker manually")
+        print("  7. Batch analysis with CSV export")
+
+        print("\n⚙️  TOOLS & SETTINGS")
+        print("  8. Position size calculator")
+        print(f"  9. Change risk/reward ratio (current: {risk_reward}:1)")
+        print(f"  10. Change timeframe (current: {timeframe_name})")
+        print("  11. Quit")
+
+        main_choice = input("\nEnter choice (1-11): ").strip()
+
+        # Quit
+        if main_choice == '11':
             print("\n" + "=" * 80)
             print(f"TRADING SIGNAL ANALYZER v{VERSION}")
             print("=" * 80)
@@ -1520,9 +1996,9 @@ through use of this software.
             print("   Trade safe. Trade smart. Manage your risk.")
             print("=" * 80)
             break
-        
+
         # Change risk/reward ratio
-        elif main_choice == '7':
+        elif main_choice == '9':
             print(f"\nCurrent ratio: {risk_reward}:1")
             rr_input = input("Enter new Risk:Reward ratio: ").strip()
             try:
@@ -1532,9 +2008,9 @@ through use of this software.
             except:
                 print("❌ Invalid input, keeping current ratio")
             continue
-        
+
         # Change timeframe
-        elif main_choice == '8':
+        elif main_choice == '10':
             print(f"\nCurrent: {timeframe_name} - {period} period with {interval} intervals")
             print("\nSelect new timeframe:")
             print("1. Scalping (1 day, 1-minute intervals)")
@@ -1563,7 +2039,116 @@ through use of this software.
             
             print(f"✅ Updated to {timeframe_name}: {period} period with {interval} intervals")
             continue
-        
+
+        # Batch CSV Export
+        elif main_choice == '7':
+            if not last_scan_type:
+                print("\n❌ No previous scan results. Run a scan first (options 1-4)")
+                input("\nPress Enter to continue...")
+                continue
+
+            print("\n" + "=" * 70)
+            print("📊 BATCH ANALYSIS WITH CSV EXPORT")
+            print("=" * 70)
+
+            # Get tickers from last scan
+            if last_scan_type == "stocks":
+                display_scanned_stocks(last_scanned_stocks)
+                tickers_to_export = choose_from_scan(last_scanned_stocks, "stocks")
+            elif last_scan_type == "forex":
+                display_forex_pairs(last_scanned_forex)
+                tickers_to_export = choose_from_scan(last_scanned_forex, "FOREX pairs")
+            elif last_scan_type == "crypto":
+                display_crypto(last_scanned_crypto)
+                tickers_to_export = choose_from_scan(last_scanned_crypto, "cryptocurrencies")
+            elif last_scan_type == "dark_flow":
+                display_dark_flow_scan_results(last_scanned_dark_flow)
+                print("\nEnter numbers (e.g., 1,2,3) or 'all':")
+                selection = input("Your selection: ").strip().lower()
+                if selection == 'all':
+                    tickers_to_export = [s['Ticker'] for s in last_scanned_dark_flow]
+                else:
+                    try:
+                        indices = [int(x.strip()) for x in selection.split(',')]
+                        tickers_to_export = [last_scanned_dark_flow[i-1]['Ticker'] for i in indices
+                                           if 1 <= i <= len(last_scanned_dark_flow)]
+                    except:
+                        tickers_to_export = []
+            else:
+                tickers_to_export = []
+
+            if not tickers_to_export:
+                print("❌ No tickers selected")
+                input("\nPress Enter to continue...")
+                continue
+
+            # Analyze all and store results
+            print(f"\n🔍 Analyzing {len(tickers_to_export)} ticker(s) for CSV export...")
+            recommendations = []
+
+            for idx, ticker in enumerate(tickers_to_export, 1):
+                print(f"⏳ Analyzing {ticker} ({idx}/{len(tickers_to_export)})...")
+                asset_type = detect_asset_type(ticker)
+                rec = analyzer.generate_recommendation(ticker, period, interval, asset_type)
+                if rec:
+                    recommendations.append(rec)
+
+            if recommendations:
+                # Export to CSV
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"trading_signals_{timestamp}.csv"
+                export_to_csv(recommendations, filename)
+
+                print(f"\n✅ Analyzed {len(recommendations)} ticker(s)")
+                print(f"📁 Results exported to: {filename}")
+            else:
+                print("\n⚠️  No successful analyses to export")
+
+            input("\n📊 Press Enter to return to main menu...")
+            continue
+
+        # Position Size Calculator
+        elif main_choice == '8':
+            print("\n" + "=" * 70)
+            print("💰 POSITION SIZE CALCULATOR")
+            print("=" * 70)
+            print("\nCalculate optimal position size based on account risk management")
+
+            try:
+                account_balance = float(input("\nEnter account balance ($): ").strip())
+                risk_percent = float(input("Risk per trade (%, e.g., 1 for 1%): ").strip())
+                entry_price = float(input("Entry price ($): ").strip())
+                stop_loss = float(input("Stop loss price ($): ").strip())
+
+                position = analyzer.calculate_position_size(account_balance, risk_percent, entry_price, stop_loss)
+
+                if 'error' in position:
+                    print(f"\n❌ {position['error']}")
+                else:
+                    print("\n" + "=" * 70)
+                    print("📊 POSITION SIZE RECOMMENDATION")
+                    print("=" * 70)
+                    print(f"\n💰 Account Balance: ${account_balance:,.2f}")
+                    print(f"⚠️  Risk Per Trade: {risk_percent}% (${position['risk_amount']:,.2f})")
+                    print(f"\n📍 Entry Price: ${entry_price:.2f}")
+                    print(f"🛑 Stop Loss: ${stop_loss:.2f}")
+                    print(f"📏 Risk Per Share: ${position['risk_per_share']:.2f}")
+                    print(f"\n✅ SHARES TO BUY: {position['shares']:,}")
+                    print(f"💵 Position Value: ${position['position_value']:,.2f}")
+                    print(f"📊 Percent of Account: {position['percent_of_account']:.1f}%")
+
+                    if position['percent_of_account'] > 20:
+                        print("\n⚠️  WARNING: Position exceeds 20% of account!")
+                        print("   Consider reducing position size for better risk management")
+
+            except ValueError:
+                print("\n❌ Invalid input. Please enter numeric values.")
+            except Exception as e:
+                print(f"\n❌ Error: {e}")
+
+            input("\n📊 Press Enter to return to main menu...")
+            continue
+
         # Get tickers to analyze
         tickers = []
         
@@ -1743,10 +2328,11 @@ through use of this software.
                         for stock in selected:
                             display_dark_flow_analysis(stock['Analysis'])
                             
-                            # Ask if user wants VWAP/MACD analysis
-                            analyze_choice = input(f"\nAnalyze {stock['Ticker']} with VWAP/MACD? (y/n): ").strip().lower()
+                            # Ask if user wants full technical analysis
+                            analyze_choice = input(f"\nRun full technical analysis on {stock['Ticker']}? (y/n): ").strip().lower()
                             if analyze_choice == 'y':
-                                rec = analyzer.generate_recommendation(stock['Ticker'], period, interval)
+                                asset_type = detect_asset_type(stock['Ticker'])
+                                rec = analyzer.generate_recommendation(stock['Ticker'], period, interval, asset_type)
                                 if rec:
                                     display_recommendation(rec)
                             
@@ -1777,10 +2363,11 @@ through use of this software.
                 if analysis:
                     display_dark_flow_analysis(analysis)
                     
-                    # Ask if user wants to analyze this ticker with VWAP/MACD
-                    analyze_choice = input(f"\nAnalyze {ticker} with VWAP/MACD? (y/n): ").strip().lower()
+                    # Ask if user wants full technical analysis
+                    analyze_choice = input(f"\nRun full technical analysis on {ticker}? (y/n): ").strip().lower()
                     if analyze_choice == 'y':
-                        rec = analyzer.generate_recommendation(ticker, period, interval)
+                        asset_type = detect_asset_type(ticker)
+                        rec = analyzer.generate_recommendation(ticker, period, interval, asset_type)
                         if rec:
                             display_recommendation(rec)
                 
@@ -1856,9 +2443,10 @@ through use of this software.
             print(f"\n{'='*70}")
             print(f"⏳ Analyzing {ticker} ({idx}/{len(tickers)})...")
             print(f"{'='*70}")
-            
-            rec = analyzer.generate_recommendation(ticker, period, interval)
-            
+
+            asset_type = detect_asset_type(ticker)
+            rec = analyzer.generate_recommendation(ticker, period, interval, asset_type)
+
             if rec:
                 display_recommendation(rec)
             else:
