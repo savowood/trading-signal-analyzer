@@ -1,8 +1,13 @@
 """
-Trading Signal Analyzer v0.95 - Entry/Exit Point Prediction
+Trading Signal Analyzer v0.96 - Entry/Exit Point Prediction
 Copyright (C) 2025 Michael Johnson (GitHub: @savowood)
 
 FULLY INTEGRATED VERSION with Enhanced Dark Flow Market Scanner
+
+NEW in v0.96:
+- Added automatic update checker on application launch
+- Checks GitHub releases for new versions
+- Non-blocking update notification with download link
 
 NEW in v0.95:
 - Added RSI indicator (14-period)
@@ -78,7 +83,7 @@ for your trading decisions and their consequences.
 USE AT YOUR OWN RISK.
 ================================================================================
 
-Version: 0.95
+Version: 0.96
 NEW 5 PILLARS: +10% Day, 5x RelVol, News Catalyst, $2-$20, <20M Float
 Uses VWAP bands (2σ, 3σ) + MACD + RSI + SuperTrend + Signal Scoring for optimal entry/exit
 Includes integrated 5 Pillars Scanner + FOREX + Dynamic Crypto + ENHANCED Dark Flow Market Scanner
@@ -95,7 +100,7 @@ import csv
 warnings.filterwarnings('ignore')
 
 # Version info
-VERSION = "0.95"
+VERSION = "0.96"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -1857,6 +1862,45 @@ def display_dark_flow_analysis(analysis: Dict):
     print("=" * 80)
 
 
+def check_for_updates():
+    """Check for updates from GitHub releases"""
+    try:
+        # Query GitHub API for latest release
+        url = "https://api.github.com/repos/savowood/trading-signal-analyzer/releases/latest"
+        response = requests.get(url, timeout=2)
+
+        if response.status_code == 200:
+            latest_version = response.json().get('tag_name', '').lstrip('v')
+
+            # Compare versions (simple string comparison works for semantic versioning)
+            if latest_version and latest_version != VERSION:
+                # Parse versions for proper comparison
+                try:
+                    current_parts = [int(x) for x in VERSION.split('.')]
+                    latest_parts = [int(x) for x in latest_version.split('.')]
+
+                    # Pad to same length
+                    max_len = max(len(current_parts), len(latest_parts))
+                    current_parts.extend([0] * (max_len - len(current_parts)))
+                    latest_parts.extend([0] * (max_len - len(latest_parts)))
+
+                    if latest_parts > current_parts:
+                        print("\n" + "🔔" * 40)
+                        print(f"📢 UPDATE AVAILABLE!")
+                        print(f"   Current version: v{VERSION}")
+                        print(f"   Latest version:  v{latest_version}")
+                        print(f"   Download: https://github.com/savowood/trading-signal-analyzer/releases/latest")
+                        print("🔔" * 40 + "\n")
+                except (ValueError, AttributeError):
+                    # If version parsing fails, just do string comparison
+                    if latest_version > VERSION:
+                        print(f"\n📢 Update available: v{latest_version} (current: v{VERSION})")
+                        print(f"   Download: https://github.com/savowood/trading-signal-analyzer/releases/latest\n")
+    except:
+        # Silently fail - don't block app if update check fails
+        pass
+
+
 def main():
     """Main application"""
     print("=" * 80)
@@ -1865,7 +1909,13 @@ def main():
     print("=" * 80)
     print(f"Author: {AUTHOR} | License: {LICENSE}")
     print(f"Based on the 5 Pillars of Day Trading methodology")
-    print("\nNEW in v0.95:")
+
+    # Check for updates
+    check_for_updates()
+    print("\nNEW in v0.96:")
+    print("  🔔 Automatic Update Checker on Launch")
+    print("  🔔 GitHub Release Version Notifications")
+    print("\nFROM v0.95:")
     print("  ✨ RSI Indicator (14-period)")
     print("  ✨ SuperTrend Indicator (ATR-based)")
     print("  ✨ EMA 9/20 Crossover Signals")
