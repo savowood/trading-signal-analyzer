@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.97] - 2025-01-27
+
+### Added
+- **Extended Trading Hours Support** - Comprehensive pre-market and after-hours analysis
+  - Pre-market analysis (4:00 AM - 9:30 AM ET)
+  - After-hours analysis (4:00 PM - 8:00 PM ET)
+  - Extended hours price change calculations vs. last regular market close
+  - Volume tracking for pre-market and after-hours sessions
+  - High/low range displays for each extended session
+  - Timezone-aware session detection and separation
+  - Green/red emoji indicators for price direction (🟢/🔴/⚪)
+- **Enhanced Data Collection** - All stock data fetching now includes extended hours
+  - `analyze_stock()` uses `prepost=True` for comprehensive data
+  - `check_multi_timeframe()` includes extended hours in trend analysis
+  - `analyze_institutional_levels()` tracks extended hours volume patterns
+- **Smart Display Integration** - Extended hours info shown in analysis output
+  - Displays after current price in recommendation view
+  - Formatted volume with thousands separators
+  - Price ranges adapt to stock price level (penny stocks, crypto, etc.)
+  - Only shown for stocks (not forex/crypto which trade 24/7)
+
+### Why This Feature?
+Extended hours trading provides critical insights:
+- **Pre-market momentum** - See institutional positioning before market open
+- **After-hours reactions** - Track immediate response to earnings and news
+- **Better timing** - Make more informed entry/exit decisions with complete data
+- **Volume analysis** - Understand institutional activity outside regular hours
+
+---
+
+## [0.96] - 2025-01-27
+
+### Added
+- **Automatic Update Checker** - Checks for new releases on application launch
+  - Queries GitHub releases API for latest version
+  - Semantic version comparison (handles 0.95, 0.96, 1.0, etc.)
+  - Non-blocking with 2-second timeout (won't delay app startup)
+  - Prominent notification with download link when update available
+  - Silently fails if network unavailable or API rate-limited
+  - Shows version comparison: Current vs. Latest
+
+### Technical
+- Uses GitHub API endpoint: `/repos/savowood/trading-signal-analyzer/releases/latest`
+- Parses version tags (strips 'v' prefix if present)
+- Proper semantic version comparison with padding
+- Graceful error handling for network issues
+
+---
+
+## [0.95] - 2025-01-26
+
+### Added
+- **RSI Indicator (14-period)** - Classic momentum oscillator
+  - Overbought detection (RSI > 70)
+  - Oversold detection (RSI < 30)
+  - Neutral zone identification
+  - Displayed in analysis output with status
+- **SuperTrend Indicator** - ATR-based trend following system
+  - 10-period ATR with 3.0 multiplier
+  - Dynamic support/resistance levels
+  - Bullish/bearish trend detection (🟢/🔴 indicators)
+  - Upper and lower band calculations
+- **Volume Confirmation Analysis** - Validates signals with volume data
+  - Relative volume ratio vs. 20-period average
+  - Strong confirmation (2x+ volume)
+  - Moderate confirmation (1.5x-2x volume)
+  - Weak/no confirmation (< 1.5x volume)
+- **EMA 9/20 Crossover Signals** - Fast/slow moving average system
+  - Bullish crossover detection (9 crosses above 20)
+  - Bearish crossunder detection (9 crosses below 20)
+  - Current EMA values displayed
+  - Signal strength integration
+- **Multi-Timeframe Trend Confirmation** - Analyzes 3 timeframes simultaneously
+  - 1-hour trend (20-period EMA)
+  - 4-hour trend (20-period EMA)
+  - Daily trend (50-period EMA)
+  - Bullish/bearish/mixed alignment detection
+  - Counts bullish trends across timeframes
+  - Different periods for crypto vs. stocks
+- **Signal Strength Scoring System** - Comprehensive 0-100 score with letter grades
+  - Grade A (90-100): Excellent setup, all indicators aligned
+  - Grade B (80-89): Strong setup, most indicators positive
+  - Grade C (70-79): Good setup, favorable conditions
+  - Grade D (60-69): Marginal setup, mixed signals
+  - Grade F (< 60): Poor setup, unfavorable conditions
+  - Scoring factors:
+    - VWAP position (40 points max)
+    - MACD signals (20 points max)
+    - RSI levels (15 points max)
+    - Volume confirmation (10 points max)
+    - Multi-timeframe alignment (15 points max)
+- **Position Sizing Calculator** - Risk-based position management
+  - Account size input
+  - Risk percentage per trade (default 1%)
+  - Automatic share calculation based on stop loss
+  - Dollar risk amount display
+  - Portfolio percentage allocation
+- **CSV Export for Batch Analysis** - Save analysis results to file
+  - All key metrics exported
+  - Timestamp included
+  - Suitable for further analysis or record keeping
+- **Crypto-Specific Parameter Adjustments** - Optimized for cryptocurrency volatility
+  - Different multi-timeframe periods
+  - Adjusted for 24/7 trading
+  - Higher volatility accommodation
+
+### Changed
+- Signal recommendation now includes comprehensive scoring
+- Entry/exit calculations factor in multiple indicators
+- Analysis output expanded with new indicator sections
+- More granular signal strength classification
+
+---
+
+## [0.94] - 2025-01-25
+
+### Fixed
+- **VWAP Bands Corrected** - Now use 2σ and 3σ (instead of 1σ and 2σ)
+  - Upper bands: +2σ and +3σ from VWAP
+  - Lower bands: -2σ and -3σ from VWAP
+  - Updated all display text to reflect correct bands
+  - More accurate extreme zone detection
+- **Stock Scanner Price Filter** - Now properly enforced
+  - Minimum price: 90% of lower bound (prevents edge cases)
+  - Better filtering of stocks near price boundaries
+  - Reduced false positives from delisted stocks
+- **Cryptocurrency Scanner** - Now fully dynamic
+  - Fetches real-time data from CoinGecko API
+  - No more hardcoded ticker lists
+  - Automatically gets top cryptocurrencies by market cap
+  - Handles API failures gracefully
+  - Shows trading volume and market cap
+- **Removed Delisted/Inactive Crypto Tickers** - Clean dataset
+  - Removed deprecated tokens
+  - Removed low-volume/dead projects
+  - Focus on actively traded cryptocurrencies
+
+### Changed
+- VWAP zone descriptions updated throughout codebase
+- Scanner output shows "2σ" and "3σ" labels
+- Crypto scanner more reliable with dynamic data
+
+---
+
 ## [0.93] - 2025-01-XX
 
 ### Changed - NEW 5 PILLARS CRITERIA

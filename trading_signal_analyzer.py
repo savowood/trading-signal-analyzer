@@ -1,8 +1,15 @@
 """
-Trading Signal Analyzer v0.96 - Entry/Exit Point Prediction
+Trading Signal Analyzer v0.97 - Entry/Exit Point Prediction
 Copyright (C) 2025 Michael Johnson (GitHub: @savowood)
 
 FULLY INTEGRATED VERSION with Enhanced Dark Flow Market Scanner
+
+NEW in v0.97:
+- Added extended trading hours support (pre-market and after-hours)
+- Pre-market activity analysis (4:00 AM - 9:30 AM ET)
+- After-hours activity analysis (4:00 PM - 8:00 PM ET)
+- Extended hours price changes, volume, and range displays
+- Full integration with all stock data fetching and analysis
 
 NEW in v0.96:
 - Added automatic update checker on application launch
@@ -83,10 +90,11 @@ for your trading decisions and their consequences.
 USE AT YOUR OWN RISK.
 ================================================================================
 
-Version: 0.96
+Version: 0.97
 NEW 5 PILLARS: +10% Day, 5x RelVol, News Catalyst, $2-$20, <20M Float
 Uses VWAP bands (2σ, 3σ) + MACD + RSI + SuperTrend + Signal Scoring for optimal entry/exit
 Includes integrated 5 Pillars Scanner + FOREX + Dynamic Crypto + ENHANCED Dark Flow Market Scanner
+Extended Hours Support: Pre-market (4AM-9:30AM ET) + After-hours (4PM-8PM ET)
 """
 
 import yfinance as yf
@@ -100,7 +108,7 @@ import csv
 warnings.filterwarnings('ignore')
 
 # Version info
-VERSION = "0.96"
+VERSION = "0.97"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -850,6 +858,124 @@ class TechnicalAnalyzer:
             'description': description
         }
 
+    def analyze_extended_hours(self, df: pd.DataFrame) -> Dict:
+        """Analyze pre-market and after-hours trading activity"""
+        try:
+            if df.empty:
+                return None
+
+            # Get market hours (9:30 AM - 4:00 PM ET)
+            # Pre-market: 4:00 AM - 9:30 AM ET
+            # After-hours: 4:00 PM - 8:00 PM ET
+
+            extended_hours_data = {
+                'has_premarket': False,
+                'has_afterhours': False,
+                'premarket_change': 0.0,
+                'afterhours_change': 0.0,
+                'premarket_volume': 0,
+                'afterhours_volume': 0,
+                'last_regular_close': None,
+                'premarket_high': None,
+                'premarket_low': None,
+                'afterhours_high': None,
+                'afterhours_low': None
+            }
+
+            # Get the most recent day's data
+            if len(df) < 2:
+                return extended_hours_data
+
+            # Get timezone-aware timestamps
+            latest_time = df.index[-1]
+
+            # Find regular market hours (9:30 AM - 4:00 PM ET)
+            # Pre-market is 4:00 AM - 9:30 AM ET
+            # After-hours is 4:00 PM - 8:00 PM ET
+
+            # Get last 24 hours of data
+            cutoff_time = latest_time - timedelta(hours=24)
+            recent_df = df[df.index > cutoff_time].copy()
+
+            if recent_df.empty:
+                return extended_hours_data
+
+            # Convert to ET timezone for analysis
+            try:
+                if recent_df.index.tz is None:
+                    recent_df.index = recent_df.index.tz_localize('America/New_York')
+                else:
+                    recent_df.index = recent_df.index.tz_convert('America/New_York')
+            except:
+                # If timezone conversion fails, use simple hour check
+                pass
+
+            # Separate by time of day
+            premarket_data = []
+            afterhours_data = []
+            regular_hours_data = []
+
+            for idx, row in recent_df.iterrows():
+                hour = idx.hour
+                minute = idx.minute
+
+                # Pre-market: 4:00 AM - 9:29 AM
+                if (hour >= 4 and hour < 9) or (hour == 9 and minute < 30):
+                    premarket_data.append(row)
+                # After-hours: 4:00 PM - 8:00 PM
+                elif hour >= 16 and hour < 20:
+                    afterhours_data.append(row)
+                # Regular hours: 9:30 AM - 3:59 PM
+                elif (hour == 9 and minute >= 30) or (hour >= 10 and hour < 16):
+                    regular_hours_data.append(row)
+
+            # Get last regular market close
+            if regular_hours_data:
+                extended_hours_data['last_regular_close'] = regular_hours_data[-1]['Close']
+
+            # Analyze pre-market
+            if premarket_data:
+                premarket_df = pd.DataFrame(premarket_data)
+                extended_hours_data['has_premarket'] = True
+                extended_hours_data['premarket_volume'] = int(premarket_df['Volume'].sum())
+                extended_hours_data['premarket_high'] = float(premarket_df['High'].max())
+                extended_hours_data['premarket_low'] = float(premarket_df['Low'].min())
+
+                if extended_hours_data['last_regular_close']:
+                    premarket_current = premarket_df['Close'].iloc[-1]
+                    extended_hours_data['premarket_change'] = (
+                        (premarket_current - extended_hours_data['last_regular_close']) /
+                        extended_hours_data['last_regular_close'] * 100
+                    )
+
+            # Analyze after-hours
+            if afterhours_data:
+                afterhours_df = pd.DataFrame(afterhours_data)
+                extended_hours_data['has_afterhours'] = True
+                extended_hours_data['afterhours_volume'] = int(afterhours_df['Volume'].sum())
+                extended_hours_data['afterhours_high'] = float(afterhours_df['High'].max())
+                extended_hours_data['afterhours_low'] = float(afterhours_df['Low'].min())
+
+                if extended_hours_data['last_regular_close']:
+                    afterhours_current = afterhours_df['Close'].iloc[-1]
+                    extended_hours_data['afterhours_change'] = (
+                        (afterhours_current - extended_hours_data['last_regular_close']) /
+                        extended_hours_data['last_regular_close'] * 100
+                    )
+
+            return extended_hours_data
+
+        except Exception as e:
+            # Return default data if analysis fails
+            return {
+                'has_premarket': False,
+                'has_afterhours': False,
+                'premarket_change': 0.0,
+                'afterhours_change': 0.0,
+                'premarket_volume': 0,
+                'afterhours_volume': 0
+            }
+
     def check_multi_timeframe(self, ticker: str, asset_type: str = 'stock') -> Dict:
         """Check trend across multiple timeframes for confirmation"""
         try:
@@ -859,6 +985,11 @@ class TechnicalAnalyzer:
                 tf_1h = stock.history(period='7d', interval='1h')
                 tf_4h = stock.history(period='30d', interval='1h')
                 tf_1d = stock.history(period='90d', interval='1d')
+            elif asset_type == 'stock':
+                # Include extended hours for stock analysis
+                tf_1h = stock.history(period='5d', interval='1h', prepost=True)
+                tf_4h = stock.history(period='1mo', interval='1d', prepost=True)
+                tf_1d = stock.history(period='3mo', interval='1d', prepost=True)
             else:
                 tf_1h = stock.history(period='5d', interval='1h')
                 tf_4h = stock.history(period='1mo', interval='1d')
@@ -1040,7 +1171,11 @@ class TechnicalAnalyzer:
         """Perform complete technical analysis on a stock/forex/crypto"""
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period, interval=interval)
+            # Include extended hours (pre-market and after-hours) for stocks
+            if asset_type == 'stock':
+                df = stock.history(period=period, interval=interval, prepost=True)
+            else:
+                df = stock.history(period=period, interval=interval)
             
             if df.empty or len(df) < 26:
                 return None
@@ -1118,6 +1253,11 @@ class TechnicalAnalyzer:
             volume_check = self.check_volume_confirmation(df)
             multi_timeframe = self.check_multi_timeframe(ticker, asset_type)
 
+            # Analyze extended hours for stocks
+            extended_hours = None
+            if asset_type == 'stock':
+                extended_hours = self.analyze_extended_hours(df)
+
             # Create analysis dict
             analysis_dict = {
                 'ticker': ticker,
@@ -1143,6 +1283,7 @@ class TechnicalAnalyzer:
                 'ema_cross': ema_cross,
                 'volume_check': volume_check,
                 'multi_timeframe': multi_timeframe,
+                'extended_hours': extended_hours,
                 'asset_type': asset_type,
                 'dataframe': df
             }
@@ -1281,7 +1422,60 @@ def display_recommendation(rec: Dict):
         price_format = f"${price:.2f}"
     
     print(f"\n💰 CURRENT PRICE: {price_format}")
-    
+
+    # Display extended hours information for stocks
+    if rec.get('extended_hours') and rec.get('asset_type') == 'stock':
+        ext_hours = rec['extended_hours']
+
+        if ext_hours.get('has_premarket') or ext_hours.get('has_afterhours'):
+            print(f"\n🌅 EXTENDED HOURS ACTIVITY:")
+
+            if ext_hours.get('has_premarket'):
+                pm_change = ext_hours['premarket_change']
+                pm_emoji = "🟢" if pm_change > 0 else "🔴" if pm_change < 0 else "⚪"
+                pm_volume = ext_hours.get('premarket_volume', 0)
+
+                print(f"   Pre-Market: {pm_emoji} {pm_change:+.2f}%", end="")
+                if pm_volume > 0:
+                    print(f" | Vol: {pm_volume:,}", end="")
+
+                pm_high = ext_hours.get('premarket_high')
+                pm_low = ext_hours.get('premarket_low')
+                if pm_high and pm_low:
+                    if price < 0.01:
+                        print(f" | Range: ${pm_low:.6f} - ${pm_high:.6f}")
+                    elif price < 0.10:
+                        print(f" | Range: ${pm_low:.4f} - ${pm_high:.4f}")
+                    elif price < 1.00:
+                        print(f" | Range: ${pm_low:.3f} - ${pm_high:.3f}")
+                    else:
+                        print(f" | Range: ${pm_low:.2f} - ${pm_high:.2f}")
+                else:
+                    print()
+
+            if ext_hours.get('has_afterhours'):
+                ah_change = ext_hours['afterhours_change']
+                ah_emoji = "🟢" if ah_change > 0 else "🔴" if ah_change < 0 else "⚪"
+                ah_volume = ext_hours.get('afterhours_volume', 0)
+
+                print(f"   After-Hours: {ah_emoji} {ah_change:+.2f}%", end="")
+                if ah_volume > 0:
+                    print(f" | Vol: {ah_volume:,}", end="")
+
+                ah_high = ext_hours.get('afterhours_high')
+                ah_low = ext_hours.get('afterhours_low')
+                if ah_high and ah_low:
+                    if price < 0.01:
+                        print(f" | Range: ${ah_low:.6f} - ${ah_high:.6f}")
+                    elif price < 0.10:
+                        print(f" | Range: ${ah_low:.4f} - ${ah_high:.4f}")
+                    elif price < 1.00:
+                        print(f" | Range: ${ah_low:.3f} - ${ah_high:.3f}")
+                    else:
+                        print(f" | Range: ${ah_low:.2f} - ${ah_high:.2f}")
+                else:
+                    print()
+
     indicator_type = rec.get('indicator_type', 'VWAP')
     
     vwap = rec['vwap']
@@ -1668,7 +1862,8 @@ class DarkFlowScanner:
         """Analyze volume profile to detect institutional activity levels"""
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period, interval="1h")
+            # Include extended hours for comprehensive volume analysis
+            df = stock.history(period=period, interval="1h", prepost=True)
             
             if df.empty or len(df) < 10:
                 return None
@@ -1912,9 +2107,13 @@ def main():
 
     # Check for updates
     check_for_updates()
-    print("\nNEW in v0.96:")
+    print("\nNEW in v0.97:")
+    print("  🌅 Extended Trading Hours Support")
+    print("  🌅 Pre-Market Analysis (4:00 AM - 9:30 AM ET)")
+    print("  🌅 After-Hours Analysis (4:00 PM - 8:00 PM ET)")
+    print("  🌅 Extended Hours Price Changes, Volume & Ranges")
+    print("\nFROM v0.96:")
     print("  🔔 Automatic Update Checker on Launch")
-    print("  🔔 GitHub Release Version Notifications")
     print("\nFROM v0.95:")
     print("  ✨ RSI Indicator (14-period)")
     print("  ✨ SuperTrend Indicator (ATR-based)")
