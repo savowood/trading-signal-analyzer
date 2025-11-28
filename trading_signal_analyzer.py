@@ -553,12 +553,12 @@ def display_forex_pairs(pairs: List[Dict]):
         print("No FOREX pairs found")
         return
     
-    print(f"\n{'#':<4} {'Pair':<12} {'Price':<12} {'Change%':<10} {'Week%':<10} {'Volatility%':<12}")
+    print(f"\n{'#':<4} {'Pair':<12} {'Price':<12} {'Change%':<12} {'Week%':<12} {'Volatility%':<14}")
     print("-" * 90)
-    
+
     for idx, pair in enumerate(pairs, 1):
         change_emoji = "🟢" if pair['Change%'] >= 0 else "🔴"
-        
+
         price = pair['Price']
         if price < 1:
             price_str = f"{price:.5f}"
@@ -566,9 +566,12 @@ def display_forex_pairs(pairs: List[Dict]):
             price_str = f"{price:.4f}"
         else:
             price_str = f"{price:.2f}"
-        
-        print(f"{idx:<4} {pair['Symbol']:<12} {price_str:<12} "
-              f"{change_emoji} {pair['Change%']:>+7.2f}% {pair['Week%']:>+8.2f}% {pair['Volatility%']:>10.2f}%")
+
+        change_str = f"{change_emoji} {pair['Change%']:>+6.2f}%"
+        week_str = f"{pair['Week%']:>+7.2f}%"
+        vol_str = f"{pair['Volatility%']:>8.2f}%"
+
+        print(f"{idx:<4} {pair['Symbol']:<12} {price_str:<12} {change_str:<12} {week_str:<12} {vol_str:<14}")
     
     print("-" * 90)
     print("\n💡 Tip: FOREX pairs trade 24/5 with high liquidity")
@@ -584,9 +587,9 @@ def display_crypto(cryptos: List[Dict]):
         print("No cryptocurrencies found")
         return
     
-    print(f"\n{'#':<4} {'Name':<15} {'Price':<15} {'Hour%':<10} {'Day%':<10} {'Week%':<10} {'Activity':<10}")
+    print(f"\n{'#':<4} {'Name':<20} {'Price':<18} {'Hour%':<12} {'Day%':<12} {'Week%':<12} {'Activity':<10}")
     print("-" * 95)
-    
+
     for idx, crypto in enumerate(cryptos, 1):
         if crypto['Day%'] >= 5:
             emoji = "🚀"
@@ -596,7 +599,7 @@ def display_crypto(cryptos: List[Dict]):
             emoji = "🔴"
         else:
             emoji = "📉"
-        
+
         price = crypto['Price']
         if price < 0.01:
             price_str = f"${price:.6f}"
@@ -606,10 +609,14 @@ def display_crypto(cryptos: List[Dict]):
             price_str = f"${price:.2f}"
         else:
             price_str = f"${price:,.2f}"
-        
-        print(f"{idx:<4} {crypto['Name']:<15} {price_str:<15} "
-              f"{emoji} {crypto['Hour%']:>+6.2f}% {crypto['Day%']:>+7.2f}% "
-              f"{crypto['Week%']:>+7.2f}% {crypto['Activity']:>9.1f}")
+
+        hour_str = f"{emoji} {crypto['Hour%']:>+5.2f}%"
+        day_str = f"{crypto['Day%']:>+6.2f}%"
+        week_str = f"{crypto['Week%']:>+6.2f}%"
+        activity_str = f"{crypto['Activity']:>6.1f}"
+
+        print(f"{idx:<4} {crypto['Name']:<20} {price_str:<18} "
+              f"{hour_str:<12} {day_str:<12} {week_str:<12} {activity_str:<10}")
     
     print("-" * 95)
     print("\n💡 List dynamically fetched from CoinGecko API (top 30 by market cap)")
@@ -668,23 +675,26 @@ def display_scanned_stocks(stocks: List[Dict]):
         print("No stocks found")
         return
     
-    print(f"\n{'#':<4} {'Ticker':<8} {'Price':<10} {'Score':<7} {'Today%':<10} {'RelVol':<9} {'Float(M)':<10}")
+    print(f"\n{'#':<4} {'Ticker':<10} {'Price':<12} {'Score':<14} {'Today%':<12} {'RelVol':<12} {'Float(M)':<12}")
     print("-" * 95)
-    
+
     for idx, stock in enumerate(stocks, 1):
-        score_emoji = "🔥🔥🔥" if stock['Score'] >= 5 else "🔥🔥" if stock['Score'] >= 4 else "🔥"
-        
+        score_emoji = "🔥🔥🔥" if stock['Score'] >= 5 else "🔥🔥 " if stock['Score'] >= 4 else "🔥  "
+
         price = stock['Price']
         if price < 1.00:
             price_str = f"${price:.3f}"
         else:
             price_str = f"${price:.2f}"
-        
-        float_indicator = "⭐" if stock.get('LowFloat', False) else ""
-        
-        print(f"{idx:<4} {stock['Ticker']:<8} {price_str:<10} {stock['Score']}/5 {score_emoji:<4} "
-              f"{stock['Today%']:>+8.1f}% {stock['RelVol']:<8.1f}x "
-              f"{stock['Float(M)']:<8.1f}{float_indicator:<2}")
+
+        float_indicator = "⭐" if stock.get('LowFloat', False) else "  "
+
+        score_str = f"{stock['Score']}/5 {score_emoji}"
+        today_str = f"{stock['Today%']:>+7.1f}%"
+        relvol_str = f"{stock['RelVol']:.1f} x"
+        float_str = f"{stock['Float(M)']:<6.1f} {float_indicator}"
+
+        print(f"{idx:<4} {stock['Ticker']:<10} {price_str:<12} {score_str:<14} {today_str:<12} {relvol_str:<12} {float_str:<12}")
     
     print("-" * 95)
     print("\n⭐ = Low float (<20M shares)")
@@ -1556,9 +1566,9 @@ def display_recommendation(rec: Dict):
         if alignment == 'strong_bullish':
             print(f"\n📊 Multi-Timeframe: 🟢🟢🟢 All timeframes bullish")
         elif alignment == 'bullish':
-            print(f"\n📊 Multi-Timeframe: 🟢🟢 2/3 timeframes bullish")
+            print(f"\n📊 Multi-Timeframe: 🟢🟢   2/3 timeframes bullish")
         elif alignment == 'bearish':
-            print(f"\n📊 Multi-Timeframe: 🟢 1/3 timeframes bullish")
+            print(f"\n📊 Multi-Timeframe: 🟢   1/3 timeframes bullish")
         elif alignment == 'strong_bearish':
             print(f"\n📊 Multi-Timeframe: 🔴🔴🔴 All timeframes bearish")
 
@@ -1984,25 +1994,30 @@ def display_dark_flow_scan_results(results: List[Dict]):
         print("No Dark Flow signals found")
         return
     
-    print(f"\n{'#':<4} {'Ticker':<8} {'Price':<10} {'Score':<7} {'Bias':<10} "
-          f"{'Signals':<9} {'RelVol':<8} {'Change%':<9}")
-    print("-" * 100)
-    
+    print(f"\n{'#':<4} {'Ticker':<10} {'Price':<12} {'Score':<18} {'Bias':<15} "
+          f"{'Signals':<10} {'RelVol':<12} {'Change%':<10}")
+    print("-" * 105)
+
     for idx, stock in enumerate(results, 1):
         bias_emoji = "🟢" if stock['Bias'] == "BULLISH" else "🔴"
-        
+
         if stock['Score'] >= 80:
             score_emoji = "🔥🔥🔥"
         elif stock['Score'] >= 60:
-            score_emoji = "🔥🔥"
+            score_emoji = "🔥🔥 "
         else:
-            score_emoji = "🔥"
-        
+            score_emoji = "🔥  "
+
         price_str = f"${stock['Price']:.2f}"
-        
-        print(f"{idx:<4} {stock['Ticker']:<8} {price_str:<10} "
-              f"{stock['Score']}/100 {score_emoji:<4} {bias_emoji} {stock['Bias']:<8} "
-              f"{stock['Signals']:<9} {stock['RelVol']:<7.1f}x {stock['Change%']:>+7.2f}%")
+
+        score_str = f"{stock['Score']:.1f}/100 {score_emoji}"
+        bias_str = f"{bias_emoji} {stock['Bias']}"
+        relvol_str = f"{stock['RelVol']:.1f} x"
+        change_str = f"{stock['Change%']:>+6.2f}%"
+
+        print(f"{idx:<4} {stock['Ticker']:<10} {price_str:<12} "
+              f"{score_str:<18} {bias_str:<15} "
+              f"{stock['Signals']:<10} {relvol_str:<12} {change_str:<10}")
     
     print("-" * 100)
     print("\n🔥 Score: 80+ = STRONG | 60-79 = MODERATE | 50-59 = WEAK")
