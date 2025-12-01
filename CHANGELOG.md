@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.98] - 2025-12-01
+
+### Fixed
+- **Column Alignment in All Display Outputs** - Corrected misaligned columns across multiple displays
+  - Fixed Dark Flow Scanner display - Score, Bias, RelVol, and Change% now align properly
+  - Fixed Cryptocurrency display - Hour%, Day%, Week%, and Activity columns now align correctly
+  - Fixed 5 Pillars display - Score, Today%, RelVol, and Float(M) columns now align properly
+  - Fixed FOREX display - Change%, Week%, and Volatility% columns now align correctly
+  - Properly accounted for emojis (🔥, 🟢, 🔴, ⭐) in column width calculations
+  - Added spacing before "x" in RelVol values (e.g., "10.8 x" instead of "10.8x")
+  - All percentage signs and suffixes now properly included in formatted strings
+
+### Changed
+- **Dark Flow Scanner Menu Order** - Reorganized for better workflow
+  - Market-wide Dark Flow scan moved to first option (was second)
+  - Major ETFs scan moved to second option (was first)
+  - Manual ticker entry remains in third position
+  - Provides quicker access to the most powerful scanning feature
+
+### Added
+- **Quick Quit Option ('q')** - Added to all menus for faster navigation
+  - Main menu: Press 'q' to quit application (alternative to option 11)
+  - Momentum Scanner: 'q' returns to main menu from market and price selection
+  - Dark Flow Scanner: 'q' returns to main menu from all sub-menus
+  - Timeframe selection: 'q' cancels and returns to main menu
+  - All input prompts updated to show 'q' option
+  - Improves user experience with quick exit capability
+
+### Technical
+- Updated version number to 0.98 in script
+- All `.lower()` calls added to input handling for case-insensitive 'q' detection
+- Column width adjustments maintain consistency across different data types
+
+---
+
 ## [0.97] - 2025-01-27
 
 ### Added

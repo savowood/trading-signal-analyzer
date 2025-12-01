@@ -108,7 +108,7 @@ import csv
 warnings.filterwarnings('ignore')
 
 # Version info
-VERSION = "0.97"
+VERSION = "0.98"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -2222,11 +2222,12 @@ def main():
         print(f"  9. Change risk/reward ratio (current: {risk_reward}:1)")
         print(f"  10. Change timeframe (current: {timeframe_name})")
         print("  11. Quit")
+        print("  q. Quit")
 
-        main_choice = input("\nEnter choice (1-11): ").strip()
+        main_choice = input("\nEnter choice (1-11 or 'q' to quit): ").strip().lower()
 
         # Quit
-        if main_choice == '11':
+        if main_choice == '11' or main_choice == 'q':
             print("\n" + "=" * 80)
             print(f"TRADING SIGNAL ANALYZER v{VERSION}")
             print("=" * 80)
@@ -2282,10 +2283,13 @@ through use of this software.
             print("3. Short-term (1 month, 1-hour intervals)")
             print("4. Medium-term (3 months, 1-day intervals)")
             print("5. Long-term (1 year, 1-week intervals)")
-            
-            tf_choice = input("Enter choice (1-5): ").strip()
-            
-            if tf_choice == '1':
+            print("q. Quit to main menu")
+
+            tf_choice = input("Enter choice (1-5 or 'q'): ").strip().lower()
+
+            if tf_choice == 'q':
+                continue
+            elif tf_choice == '1':
                 period, interval = "1d", "1m"
                 timeframe_name = "Scalping"
             elif tf_choice == '3':
@@ -2427,9 +2431,12 @@ through use of this software.
             print("1. US Stocks (NASDAQ + NYSE) - RECOMMENDED")
             print("2. NASDAQ only")
             print("3. NYSE only")
-            market_choice = input("Enter choice (1-3): ").strip()
-            
-            if market_choice == '2':
+            print("q. Quit to main menu")
+            market_choice = input("Enter choice (1-3 or 'q'): ").strip().lower()
+
+            if market_choice == 'q':
+                continue
+            elif market_choice == '2':
                 market = '3'
             elif market_choice == '3':
                 market = '4'
@@ -2442,10 +2449,13 @@ through use of this software.
             print("3. Sub-penny ($0.0001 - $0.10)")
             print("4. Mid-cap ($20 - $100)")
             print("5. Custom range")
-            
-            price_choice = input("Enter choice (1-5) or press Enter for default: ").strip()
-            
-            if price_choice == '2':
+            print("q. Quit to main menu")
+
+            price_choice = input("Enter choice (1-5, Enter for default, or 'q'): ").strip().lower()
+
+            if price_choice == 'q':
+                continue
+            elif price_choice == '2':
                 min_price, max_price = 0.10, 2.00
             elif price_choice == '3':
                 min_price, max_price = 0.0001, 0.10
@@ -2533,21 +2543,27 @@ through use of this software.
             print("=" * 70)
             print("\nDetect institutional accumulation patterns")
             print("\nOptions:")
-            print("1. Scan major ETFs (SPY, QQQ, IWM, DIA)")
-            print("2. Scan market for Dark Flow signals")
+            print("1. Scan market for Dark Flow signals")
+            print("2. Scan major ETFs (SPY, QQQ, IWM, DIA)")
             print("3. Enter ticker(s) manually")
-            
-            df_choice = input("\nEnter choice (1-3): ").strip()
-            
-            if df_choice == '2':
+            print("q. Quit to main menu")
+
+            df_choice = input("\nEnter choice (1-3 or 'q'): ").strip().lower()
+
+            if df_choice == 'q':
+                continue
+            elif df_choice == '1':
                 # NEW FEATURE: Market-wide Dark Flow scan
                 print("\nSelect market:")
                 print("1. US Stocks (NASDAQ + NYSE) - RECOMMENDED")
                 print("2. NASDAQ only")
                 print("3. NYSE only")
-                market_choice = input("Enter choice (1-3): ").strip()
-                
-                if market_choice == '2':
+                print("q. Quit to main menu")
+                market_choice = input("Enter choice (1-3 or 'q'): ").strip().lower()
+
+                if market_choice == 'q':
+                    continue
+                elif market_choice == '2':
                     market = '3'
                 elif market_choice == '3':
                     market = '4'
@@ -2605,8 +2621,8 @@ through use of this software.
                 
                 input("\n📊 Press Enter to return to main menu...")
                 continue
-            
-            elif df_choice == '1':
+
+            elif df_choice == '2':
                 # Original: Scan major ETFs
                 tickers_to_scan = ['SPY', 'QQQ', 'IWM', 'DIA']
             else:
