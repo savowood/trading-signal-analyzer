@@ -105,10 +105,25 @@ from typing import Dict, List, Tuple, Optional
 import warnings
 import requests
 import csv
+import sys
+from pathlib import Path
 warnings.filterwarnings('ignore')
 
+# Add PressureCooker directory to path for imports
+PRESSURE_COOKER_DIR = Path.home() / 'PyClass' / 'PressureCooker'
+if PRESSURE_COOKER_DIR.exists():
+    sys.path.append(str(PRESSURE_COOKER_DIR))
+    try:
+        from pressure_cooker_scanner import PressureCookerScanner
+        from market_scanner import PressureCookerMarketScanner
+        PRESSURE_COOKER_AVAILABLE = True
+    except ImportError:
+        PRESSURE_COOKER_AVAILABLE = False
+else:
+    PRESSURE_COOKER_AVAILABLE = False
+
 # Version info
-VERSION = "0.98"
+VERSION = "0.99"
 AUTHOR = "Michael Johnson"
 LICENSE = "GPL v3"
 
@@ -2546,9 +2561,10 @@ through use of this software.
             print("1. Scan market for Dark Flow signals")
             print("2. Scan major ETFs (SPY, QQQ, IWM, DIA)")
             print("3. Enter ticker(s) manually")
+            print("4. 🔥 Pressure Cooker Scanner - Short squeeze setups")
             print("q. Quit to main menu")
 
-            df_choice = input("\nEnter choice (1-3 or 'q'): ").strip().lower()
+            df_choice = input("\nEnter choice (1-4 or 'q'): ").strip().lower()
 
             if df_choice == 'q':
                 continue
@@ -2625,37 +2641,163 @@ through use of this software.
             elif df_choice == '2':
                 # Original: Scan major ETFs
                 tickers_to_scan = ['SPY', 'QQQ', 'IWM', 'DIA']
-            else:
+            elif df_choice == '3':
                 # Original: Manual entry
                 ticker_input = input("\nEnter ticker(s) separated by commas: ").strip()
                 tickers_to_scan = [t.strip().upper() for t in ticker_input.split(',') if t.strip()]
-            
-            if not tickers_to_scan:
-                print("❌ No tickers provided")
+            elif df_choice == '4':
+                # NEW: Pressure Cooker Scanner - Short squeeze setups
+                if not PRESSURE_COOKER_AVAILABLE:
+                    print("\n❌ Pressure Cooker Scanner not available")
+                    print("   Make sure the PressureCooker directory exists at:")
+                    print(f"   {PRESSURE_COOKER_DIR}")
+                    input("\nPress Enter to continue...")
+                    continue
+
+                print("\n" + "=" * 70)
+                print("🔥 PRESSURE COOKER SCANNER")
+                print("=" * 70)
+                print("\nDetect explosive short squeeze setups")
+                print("Looking for: Ultra-low float, high volume, reverse splits")
+                print("\nOptions:")
+                print("1. Scan market for Pressure Cooker setups")
+                print("2. Analyze specific ticker")
+                print("q. Back to Dark Flow menu")
+
+                pc_choice = input("\nEnter choice (1-2 or 'q'): ").strip().lower()
+
+                if pc_choice == 'q':
+                    continue
+                elif pc_choice == '1':
+                    # Market-wide Pressure Cooker scan
+                    print("\nSelect market:")
+                    print("1. US Stocks (NASDAQ + NYSE) - RECOMMENDED")
+                    print("2. NASDAQ only")
+                    print("3. NYSE only")
+                    market_pc = input("Enter choice (1-3): ").strip()
+
+                    if market_pc == '2':
+                        market_choice = '3'
+                    elif market_pc == '3':
+                        market_choice = '4'
+                    else:
+                        market_choice = '1'
+
+                    # Get max results
+                    max_input = input("\nMax candidates to screen (default 100): ").strip()
+                    max_candidates = int(max_input) if max_input.isdigit() else 100
+
+                    print(f"\n🔍 Scanning for Pressure Cooker setups...")
+                    scanner = PressureCookerMarketScanner()
+                    results = scanner.scan_market(market_choice, max_candidates)
+
+                    if results:
+                        # Display results
+                        print("\n" + "=" * 100)
+                        print("🔥 PRESSURE COOKER SCANNER RESULTS")
+                        print("=" * 100)
+                        print(f"\n{'#':<4} {'Ticker':<8} {'Score':<10} {'Grade':<8} {'Price':<10} "
+                              f"{'Float(M)':<12} {'RelVol':<10} {'Short%':<10}")
+                        print("-" * 100)
+
+                        for idx, r in enumerate(results, 1):
+                            emoji = "🔥🔥🔥" if r['score'] >= 85 else "🔥🔥" if r['score'] >= 75 else "🔥"
+
+                            print(f"{idx:<4} {r['ticker']:<8} {r['score']:<3}/100 {emoji} {r['grade']:<8} "
+                                  f"${r['current_price']:<9.2f} {r['float_millions']:<12.2f} "
+                                  f"{r['rel_vol']:<9.1f}x {r['short_percent']:<9.1f}%")
+
+                        print("-" * 100)
+                        print(f"\n✅ Found {len(results)} Pressure Cooker setups")
+                        print("\n💡 Scores: 85+ = Excellent | 75-84 = Strong | 70-74 = Good")
+                        print("🔥 These are EXTREMELY volatile - use 1-2% position sizes MAX")
+
+                        # Ask if user wants detailed analysis of any
+                        detail_choice = input("\nView detailed analysis of a ticker? Enter # or 'n': ").strip()
+                        if detail_choice.isdigit() and 1 <= int(detail_choice) <= len(results):
+                            selected = results[int(detail_choice) - 1]
+                            # Run full technical analysis on selected ticker
+                            asset_type = detect_asset_type(selected['ticker'])
+                            rec = analyzer.generate_recommendation(selected['ticker'], period, interval, asset_type)
+                            if rec:
+                                display_recommendation(rec)
+                    else:
+                        print("\n❌ No Pressure Cooker setups found matching criteria")
+                        print("   Try adjusting parameters or check back later")
+
+                    input("\n📊 Press Enter to return to main menu...")
+                    continue
+
+                elif pc_choice == '2':
+                    # Analyze specific ticker
+                    ticker_input = input("\nEnter ticker to analyze: ").strip().upper()
+                    if ticker_input:
+                        print(f"\n🔍 Analyzing {ticker_input} for Pressure Cooker setup...")
+                        scanner = PressureCookerScanner()
+                        analysis = scanner.analyze_ticker(ticker_input, period="3mo")
+
+                        if analysis:
+                            # Display Pressure Cooker analysis
+                            print("\n" + "=" * 80)
+                            print(f"🔥 PRESSURE COOKER ANALYSIS: {analysis['ticker']}")
+                            print("=" * 80)
+                            print(f"\n📊 Score: {analysis['score']}/100 - Grade: {analysis['grade']}")
+                            print(f"💰 Current Price: ${analysis['current_price']:.2f}")
+                            print(f"📈 Float: {analysis['float_millions']:.2f}M shares")
+                            print(f"📊 Relative Volume: {analysis['rel_vol']:.1f}x")
+                            print(f"🔥 Short Interest: {analysis['short_percent']:.1f}%")
+                            print(f"\n✨ Setup Quality: {analysis['setup_quality']}")
+                            print(f"📝 Summary: {analysis['summary']}")
+
+                            # Ask if user wants full technical analysis
+                            analyze_choice = input(f"\nRun full technical analysis on {ticker_input}? (y/n): ").strip().lower()
+                            if analyze_choice == 'y':
+                                asset_type = detect_asset_type(ticker_input)
+                                rec = analyzer.generate_recommendation(ticker_input, period, interval, asset_type)
+                                if rec:
+                                    display_recommendation(rec)
+                        else:
+                            print(f"\n❌ Could not analyze {ticker_input}")
+
+                    input("\n📊 Press Enter to return to main menu...")
+                    continue
+                else:
+                    print("\n❌ Invalid choice")
+                    input("\nPress Enter to continue...")
+                    continue
+            else:
+                print("\n❌ Invalid choice")
                 input("\nPress Enter to continue...")
                 continue
-            
-            # Create scanner and analyze tickers (original functionality)
-            dark_flow = DarkFlowScanner()
-            
-            for ticker in tickers_to_scan:
-                analysis = dark_flow.analyze_institutional_levels(ticker, period="5d")
-                if analysis:
-                    display_dark_flow_analysis(analysis)
-                    
-                    # Ask if user wants full technical analysis
-                    analyze_choice = input(f"\nRun full technical analysis on {ticker}? (y/n): ").strip().lower()
-                    if analyze_choice == 'y':
-                        asset_type = detect_asset_type(ticker)
-                        rec = analyzer.generate_recommendation(ticker, period, interval, asset_type)
-                        if rec:
-                            display_recommendation(rec)
-                
-                if len(tickers_to_scan) > 1 and ticker != tickers_to_scan[-1]:
-                    input("\nPress Enter to continue to next ticker...")
-            
-            input("\n📊 Press Enter to return to main menu...")
-            continue
+
+            # This section handles options 2 and 3 (ETFs and manual entry)
+            if 'tickers_to_scan' in locals():
+                if not tickers_to_scan:
+                    print("❌ No tickers provided")
+                    input("\nPress Enter to continue...")
+                    continue
+
+                # Create scanner and analyze tickers (original functionality)
+                dark_flow = DarkFlowScanner()
+
+                for ticker in tickers_to_scan:
+                    analysis = dark_flow.analyze_institutional_levels(ticker, period="5d")
+                    if analysis:
+                        display_dark_flow_analysis(analysis)
+
+                        # Ask if user wants full technical analysis
+                        analyze_choice = input(f"\nRun full technical analysis on {ticker}? (y/n): ").strip().lower()
+                        if analyze_choice == 'y':
+                            asset_type = detect_asset_type(ticker)
+                            rec = analyzer.generate_recommendation(ticker, period, interval, asset_type)
+                            if rec:
+                                display_recommendation(rec)
+
+                    if len(tickers_to_scan) > 1 and ticker != tickers_to_scan[-1]:
+                        input("\nPress Enter to continue to next ticker...")
+
+                input("\n📊 Press Enter to return to main menu...")
+                continue
         
         # Analyze from last scan
         elif main_choice == '5':

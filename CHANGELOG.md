@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.99] - 2025-12-02
+
+### Added
+- **🔥 Pressure Cooker Scanner** - New short squeeze detection system integrated into Dark Flow menu
+  - Market-wide scanning for explosive short squeeze setups
+  - Individual ticker analysis for Pressure Cooker patterns
+  - Scoring system (0-100) with grades A-D for setup quality
+  - Detection of ultra-low float stocks (< 1M shares ideal)
+  - High relative volume analysis (5x+ preferred)
+  - Reverse split detection and tracking
+  - Short interest analysis (when data available)
+  - Integration with full technical analysis for selected setups
+  - Automated daily scanning capability via cron job
+  - Email notifications for high-quality setups (score ≥ 75)
+  - SQLite database for persistent storage of scan results
+  - Watchlist tracking for promising opportunities
+
+### Technical
+- Added PressureCooker module imports with graceful fallback
+- Pressure Cooker Scanner accessible as option 4 in Dark Flow Scanner menu
+- Imports from ~/PyClass/PressureCooker directory
+- Modules: pressure_cooker_scanner.py, market_scanner.py
+- Updated version number to 0.99
+
+---
+
 ## [0.98] - 2025-12-01
 
 ### Fixed
