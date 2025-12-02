@@ -2236,13 +2236,11 @@ def main():
         print("  8. Position size calculator")
         print(f"  9. Change risk/reward ratio (current: {risk_reward}:1)")
         print(f"  10. Change timeframe (current: {timeframe_name})")
-        print("  11. Quit")
-        print("  q. Quit")
 
         main_choice = input("\nEnter choice (1-11 or 'q' to quit): ").strip().lower()
 
         # Quit
-        if main_choice == '11' or main_choice == 'q':
+        if main_choice == 'q':
             print("\n" + "=" * 80)
             print(f"TRADING SIGNAL ANALYZER v{VERSION}")
             print("=" * 80)
