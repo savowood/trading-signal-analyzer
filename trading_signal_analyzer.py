@@ -106,6 +106,7 @@ import warnings
 import requests
 import csv
 import sys
+import json
 from pathlib import Path
 warnings.filterwarnings('ignore')
 
@@ -207,10 +208,164 @@ def is_likely_delisted(ticker: str, price: float, volume: int, market_cap: float
     return False
 
 
-def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0, 
+# Micro-cap tickers to check directly (TradingView often misses these)
+MICROCAP_WATCHLIST = [
+    'HTOO', 'VHAI', 'MDAI', 'BROG', 'BKTI', 'PRQR', 'LGMK', 'CYCN',
+    'FNGG', 'PCSA', 'MICS', 'NAOV', 'APRE', 'TATT', 'KZIA', 'BTCT',
+    'FNGR', 'STSS', 'IPWR', 'GCEH', 'WISA', 'GFAI', 'BLIN', 'EEMX',
+    'SNAX', 'CPIX', 'SNGX', 'JILL', 'REED', 'ONVO'
+]
+
+def scan_microcaps_direct(min_price: float = 2.0, max_price: float = 20.0,
+                          min_change: float = 10.0, min_relvol: float = 5.0) -> List[Dict]:
+    """
+    Direct scan of micro-cap tickers using yfinance (TradingView supplement)
+
+    Catches small-cap stocks on NCM and other exchanges that TradingView misses.
+    Uses concurrent requests for speed (5x faster than sequential).
+
+    Args:
+        min_price: Minimum price filter
+        max_price: Maximum price filter
+        min_change: Minimum percentage gain today
+        min_relvol: Minimum relative volume multiplier
+
+    Returns:
+        List of qualifying micro-cap stocks
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    results = []
+
+    print(f"   💎 Supplemental micro-cap scan ({len(MICROCAP_WATCHLIST)} tickers)...")
+
+    def check_ticker(ticker):
+        """Check a single ticker (for threading)"""
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+
+            # Get current price
+            current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
+            if not current_price:
+                return None
+
+            # Price filter
+            if not (min_price <= current_price <= max_price):
+                return None
+
+            # Get today's change
+            prev_close = info.get('previousClose', 0)
+            if not prev_close:
+                return None
+
+            change_pct = ((current_price - prev_close) / prev_close) * 100
+
+            # Change filter
+            if change_pct < min_change:
+                return None
+
+            # Volume analysis
+            volume = info.get('volume', 0)
+            avg_volume = info.get('averageVolume', 1)
+
+            if avg_volume == 0:
+                return None
+
+            rel_vol = volume / avg_volume
+
+            # Relative volume filter
+            if rel_vol < min_relvol:
+                return None
+
+            # Float analysis
+            float_shares = info.get('floatShares', info.get('sharesOutstanding', 0))
+            float_m = float_shares / 1_000_000 if float_shares else 50
+
+            # Calculate score (same as TradingView results)
+            score = 0
+
+            # Pillar 1: Change (max 30 points)
+            if change_pct >= 50:
+                score += 30
+            elif change_pct >= 25:
+                score += 25
+            elif change_pct >= 15:
+                score += 20
+            else:
+                score += 15
+
+            # Pillar 2: Relative volume (max 30 points)
+            if rel_vol >= 20:
+                score += 30
+            elif rel_vol >= 10:
+                score += 25
+            elif rel_vol >= 7:
+                score += 20
+            else:
+                score += 15
+
+            # Pillar 3: Float (max 20 points)
+            if float_m < 1:
+                score += 20
+            elif float_m < 5:
+                score += 15
+            elif float_m < 10:
+                score += 10
+            elif float_m < 20:
+                score += 5
+
+            # Pillar 4: Price range bonus (max 10 points)
+            if 5 <= current_price <= 15:
+                score += 10
+            elif 3 <= current_price <= 20:
+                score += 5
+
+            # Pillar 5: Strong momentum bonus (max 10 points)
+            if change_pct >= 20 and rel_vol >= 10:
+                score += 10
+            elif change_pct >= 15 and rel_vol >= 7:
+                score += 5
+
+            # Only include if score is decent
+            if score < 50:
+                return None
+
+            return {
+                'ticker': ticker,
+                'price': current_price,
+                'change_pct': change_pct,
+                'rel_vol': rel_vol,
+                'float_m': float_m,
+                'volume': volume,
+                'score': score,
+                'source': 'DIRECT',  # Mark as directly scanned
+                'exchange': info.get('exchange', 'N/A'),
+                'market_cap': info.get('marketCap', 0)
+            }
+
+        except Exception as e:
+            # Silently skip tickers with errors
+            return None
+
+    # Run checks concurrently (10 workers = ~5x speedup)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit all ticker checks
+        futures = {executor.submit(check_ticker, ticker): ticker for ticker in MICROCAP_WATCHLIST}
+
+        # Collect results as they complete
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+
+    return results
+
+
+def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0,
                         max_price: float = 20.0) -> List[Dict]:
     """
-    Integrated 5 Pillars Momentum Scanner
+    HYBRID 5 Pillars Momentum Scanner (TradingView + Direct Micro-Cap Scan)
     
     NEW 5 PILLARS CRITERIA:
     1. Up 10%+ on the day (intraday momentum)
@@ -333,10 +488,54 @@ def scan_momentum_stocks(market_choice: str = '1', min_price: float = 2.0,
                     })
             except:
                 continue
-        
+
+        # HYBRID SCAN: Add micro-cap direct scan results
+        print(f"✅ TradingView scan: {len(results)} stocks found")
+
+        microcap_results = scan_microcaps_direct(min_price, max_price, min_change=10.0, min_relvol=5.0)
+
+        if microcap_results:
+            print(f"✅ Micro-cap scan: {microcap_results.__len__()} additional stocks found")
+
+            # Convert micro-cap results to match TradingView format
+            for mc in microcap_results:
+                # Check for duplicates
+                if any(r['Ticker'] == mc['ticker'] for r in results):
+                    continue
+
+                # Calculate pillars met (0-5) to match TradingView format
+                pillars_met = 0
+                if mc['change_pct'] >= 10:  # Pillar 1: +10% day
+                    pillars_met += 1
+                if mc['rel_vol'] >= 5:  # Pillar 2: 5x+ volume
+                    pillars_met += 1
+                if mc['float_m'] < 20:  # Pillar 3: <20M float
+                    pillars_met += 1
+                if 2 <= mc['price'] <= 20:  # Pillar 4: $2-$20 range
+                    pillars_met += 1
+                # Pillar 5: Catalyst/news (assume true for direct scan results)
+                pillars_met += 1
+
+                results.append({
+                    'Ticker': mc['ticker'],
+                    'Price': mc['price'],
+                    'RelVol': mc['rel_vol'],
+                    'Float(M)': mc['float_m'],
+                    'Score': pillars_met,  # Now correctly shows 0-5 pillars
+                    'Week%': 0,  # Not available from direct scan
+                    'Today%': mc['change_pct'],
+                    'Catalyst': f"Direct ({mc['score']}/100)",  # Include 0-100 score here
+                    'LowFloat': mc['float_m'] < 20,
+                    'Description': f"[DIRECT] {mc['exchange']}"
+                })
+
         results.sort(key=lambda x: (x['Score'], x['Today%']), reverse=True)
-        
-        print(f"✅ Found {len(results)} qualifying stocks")
+
+        total_count = len(results)
+        tv_count = total_count - len(microcap_results) if microcap_results else total_count
+        mc_count = len(microcap_results) if microcap_results else 0
+
+        print(f"✅ Total: {total_count} stocks ({tv_count} from TradingView + {mc_count} from direct scan)")
         return results
         
     except Exception as e:
@@ -2087,6 +2286,74 @@ def display_dark_flow_analysis(analysis: Dict):
     print("=" * 80)
 
 
+# Configuration management
+CONFIG_FILE = Path.home() / '.trading_analyzer_config.json'
+DB_FILE = Path.home() / 'Documents' / 'trading_analyzer.db'
+
+def load_config():
+    """Load user configuration from dotfile"""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                content = f.read().strip()
+                if not content:
+                    # File is empty, return empty dict but don't overwrite
+                    return {}
+                config = json.loads(content)
+                return config if config else {}
+        except json.JSONDecodeError as e:
+            print(f"⚠️  Warning: Config file corrupted, using defaults")
+            return {}
+        except Exception as e:
+            print(f"⚠️  Warning: Could not load config: {e}")
+            return {}
+    return {}
+
+def save_config(config):
+    """Save user configuration to dotfile"""
+    # Don't save if config is empty or invalid
+    if not config or not isinstance(config, dict):
+        print(f"⚠️  Warning: Cannot save empty or invalid config")
+        return False
+
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"⚠️  Warning: Could not save config: {e}")
+        return False
+
+def update_config(key_path: str, value):
+    """Update specific config value using dot notation (e.g., 'user_preferences.risk_reward_ratio')"""
+    config = load_config()
+    keys = key_path.split('.')
+    current = config
+
+    # Navigate to the right nested dict, creating if needed
+    for key in keys[:-1]:
+        if key not in current:
+            current[key] = {}
+        current = current[key]
+
+    # Set the value
+    current[keys[-1]] = value
+    save_config(config)
+
+def get_config_value(key_path: str, default=None):
+    """Get config value using dot notation"""
+    config = load_config()
+    keys = key_path.split('.')
+    current = config
+
+    try:
+        for key in keys:
+            current = current[key]
+        return current
+    except (KeyError, TypeError):
+        return default
+
+
 def check_for_updates():
     """Check for updates from GitHub releases"""
     try:
@@ -2137,11 +2404,27 @@ def main():
 
     # Check for updates
     check_for_updates()
-    print("\nNEW in v0.97:")
+
+    # Load user configuration
+    config = load_config()
+    user_prefs = config.get('user_preferences', {})
+
+    # Load saved preferences or use defaults
+    risk_reward = user_prefs.get('risk_reward_ratio', 3.0)
+    timeframe_name = user_prefs.get('timeframe', 'Intraday')
+    period = user_prefs.get('period', '5d')
+    interval = user_prefs.get('interval', '5m')
+    disclaimer_acknowledged = user_prefs.get('disclaimer_acknowledged', False)
+
+    print("\nNEW in v0.99:")
+    print("  🔥 Pressure Cooker Scanner - Short squeeze detection")
+    print("\nFROM v0.98:")
+    print("  🎯 Fixed column alignment across all displays")
+    print("  ⚡ Quick quit option ('q') in all menus")
+    print("\nFROM v0.97:")
     print("  🌅 Extended Trading Hours Support")
     print("  🌅 Pre-Market Analysis (4:00 AM - 9:30 AM ET)")
     print("  🌅 After-Hours Analysis (4:00 PM - 8:00 PM ET)")
-    print("  🌅 Extended Hours Price Changes, Volume & Ranges")
     print("\nFROM v0.96:")
     print("  🔔 Automatic Update Checker on Launch")
     print("\nFROM v0.95:")
@@ -2154,54 +2437,30 @@ def main():
     print("  ✨ Position Sizing Calculator")
     print("  ✨ CSV Export for Batch Analysis")
     print("=" * 80)
-    
-    show_disclaimer()
 
-    print("=" * 80)
+    # Show disclaimer or acknowledge if already seen
+    if disclaimer_acknowledged:
+        print("\n✅ Welcome back! (Disclaimer previously acknowledged)")
+        print(f"   Settings: {timeframe_name}, R:R {risk_reward}:1")
+    else:
+        show_disclaimer()
+        # Save disclaimer acknowledgement
+        update_config('user_preferences.disclaimer_acknowledged', True)
+        update_config('user_preferences.disclaimer_ack_date', datetime.now().isoformat())
+        print("\n✅ Acknowledgement saved")
+
+    print("\n" + "=" * 80)
     print("📊 TECHNICAL ANALYSIS INDICATORS")
     print("=" * 80)
     print("VWAP (2σ/3σ) • MACD • RSI • SuperTrend • EMA 9/20")
     print("Volume Confirmation • Multi-Timeframe Analysis • Signal Scoring")
     print("=" * 80)
-    
-    # Get risk/reward ratio
-    print("\nEnter desired Risk/Reward ratio (default 3:1):")
-    rr_input = input("Risk:Reward ratio (e.g., 3 for 3:1): ").strip()
-    
-    try:
-        risk_reward = float(rr_input) if rr_input else 3.0
-    except:
-        risk_reward = 3.0
-    
-    print(f"\n✅ Using {risk_reward}:1 Risk/Reward ratio")
-    
-    # Get analysis timeframe
-    print("\nSelect analysis timeframe:")
-    print("1. Scalping (1 day, 1-minute intervals)")
-    print("2. Intraday (5 days, 5-minute intervals)")
-    print("3. Short-term (1 month, 1-hour intervals)")
-    print("4. Medium-term (3 months, 1-day intervals)")
-    print("5. Long-term (1 year, 1-week intervals)")
-    
-    timeframe_choice = input("Enter choice (1-5) or press Enter for intraday: ").strip()
-    
-    if timeframe_choice == '1':
-        period, interval = "1d", "1m"
-        timeframe_name = "Scalping"
-    elif timeframe_choice == '3':
-        period, interval = "1mo", "1h"
-        timeframe_name = "Short-term"
-    elif timeframe_choice == '4':
-        period, interval = "3mo", "1d"
-        timeframe_name = "Medium-term"
-    elif timeframe_choice == '5':
-        period, interval = "1y", "1wk"
-        timeframe_name = "Long-term"
-    else:
-        period, interval = "5d", "5m"
-        timeframe_name = "Intraday"
-    
-    print(f"\n✅ Using {timeframe_name}: {period} period with {interval} intervals")
+
+    # Display current settings (loaded from config)
+    print(f"\n⚙️  Current Settings:")
+    print(f"   Risk/Reward Ratio: {risk_reward}:1")
+    print(f"   Timeframe: {timeframe_name} ({period} period, {interval} intervals)")
+    print(f"   (Change in options 9 and 10)")
     
     analyzer = TechnicalAnalyzer(risk_reward_ratio=risk_reward)
     
@@ -2237,7 +2496,7 @@ def main():
         print(f"  9. Change risk/reward ratio (current: {risk_reward}:1)")
         print(f"  10. Change timeframe (current: {timeframe_name})")
 
-        main_choice = input("\nEnter choice (1-11 or 'q' to quit): ").strip().lower()
+        main_choice = input("\nEnter choice (1-10 or 'q' to quit): ").strip().lower()
 
         # Quit
         if main_choice == 'q':
@@ -2282,7 +2541,9 @@ through use of this software.
             try:
                 risk_reward = float(rr_input) if rr_input else risk_reward
                 analyzer = TechnicalAnalyzer(risk_reward_ratio=risk_reward)
-                print(f"✅ Updated to {risk_reward}:1")
+                # Save to config
+                update_config('user_preferences.risk_reward_ratio', risk_reward)
+                print(f"✅ Updated to {risk_reward}:1 (saved to preferences)")
             except:
                 print("❌ Invalid input, keeping current ratio")
             continue
@@ -2317,8 +2578,12 @@ through use of this software.
             else:
                 period, interval = "5d", "5m"
                 timeframe_name = "Intraday"
-            
-            print(f"✅ Updated to {timeframe_name}: {period} period with {interval} intervals")
+
+            # Save to config
+            update_config('user_preferences.timeframe', timeframe_name)
+            update_config('user_preferences.period', period)
+            update_config('user_preferences.interval', interval)
+            print(f"✅ Updated to {timeframe_name}: {period} period with {interval} intervals (saved to preferences)")
             continue
 
         # Batch CSV Export
