@@ -1,4 +1,31 @@
+# Trading Signal Analyzer Requirements
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
 yfinance>=0.2.28
-pandas>=1.5.0
-numpy>=1.23.0
+pandas>=2.0.0
+numpy>=1.24.0
 tradingview-screener>=0.1.0
+
+# NEW: High-performance terminal UI and charts (for ASCII charts)
+rich>=13.0.0
+
+# NEW: Excel export with formatting
+openpyxl>=3.1.0
+
+# NEW: PDF export
+reportlab>=4.0.0
+
+# NEW: Polygon.io (Massive) API for professional market data (OPTIONAL)
+# Install if you have a Polygon API key for enhanced data
+polygon-api-client>=1.14.0
+
+# Optional: NewsAPI integration (Phase 2)
+requests>=2.31.0
+
+# Optional: Reddit sentiment (Phase 2)
+praw>=7.7.0
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# black>=23.0.0

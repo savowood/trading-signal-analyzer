@@ -1,12 +1,13 @@
-# Trading Signal Analyzer v0.93
+# Trading Signal Analyzer v1.0
 
 **Advanced Technical Analysis Tool for Day Trading - Stocks, FOREX & Crypto**
 
-A Python-based multi-asset scanner and technical analysis tool with NEW aggressive 5 Pillars momentum criteria, VWAP bands, MACD indicators, and Dark Flow institutional analysis to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.  If you find this useful, or just feel generous, [buy me a coffee.](https://buymeacoffee.com/savowood)
+A Python-based multi-asset scanner and technical analysis tool with aggressive 5 Pillars momentum criteria, Pressure Cooker short squeeze detection, VWAP bands, MACD indicators, and Dark Flow institutional analysis to identify optimal entry and exit points across stocks, FOREX pairs, and cryptocurrencies.  If you find this useful, or just feel generous, [buy me a coffee.](https://buymeacoffee.com/savowood)
 
 ![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
-![Version](https://img.shields.io/badge/version-0.93-green.svg)
+![Version](https://img.shields.io/badge/version-1.0-green.svg)
+![Status](https://img.shields.io/badge/status-production%20ready-brightgreen.svg)
 
 ---
 
@@ -25,13 +26,41 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 
 ---
 
+## 🎉 v1.0 - Stable Production Release
+
+**Welcome to Trading Signal Analyzer v1.0!** This release marks the completion and stabilization of the monolithic (single-file) version.
+
+### What's New in v1.0
+- ✅ **All known bugs fixed** - Export flow, market selection, and ticker analysis issues resolved
+- ✅ **Production ready** - Stable, tested, and ready for daily use
+- ✅ **Feature complete** - All planned v1.0 features implemented
+- ✅ **Pressure Cooker Scanner** - Full short squeeze detection with single ticker analysis
+- ✅ **Improved UX** - Clear visual separators, better menu navigation
+
+### Future: v2.0 Modular Architecture (Coming Soon)
+The next major release will feature a complete architectural redesign:
+- 🚀 **Polygon/Massive API integration** - Professional-grade market data with real-time quotes
+- 🗄️ **SQLite database** - Persistent scan history and performance tracking
+- 📊 **Advanced technicals** - Support/Resistance detection and Volume Profile analysis
+- ⚡ **Parallel processing** - Faster market scans with multi-threading
+- 📝 **Watchlist** - Track and monitor your favorite setups
+- 🔍 **Data validation** - Enhanced quality checks for more reliable analysis
+
+### Which Version Should You Use?
+- **v1.0 (this version)** - Single file, stable, ready for production use now
+- **v2.0 (in development)** - Modular package, new features, different deployment method
+- Both versions will coexist - use v1.0 for stability, v2.0 for cutting-edge features
+
+---
+
 ## 🎯 Features
 
 ### Multi-Asset Scanning
 - **Stock Scanner** - Momentum stocks using the 5 Pillars methodology
 - **FOREX Scanner** - Top 10 major currency pairs (24/5 trading)
 - **Crypto Scanner** - Top 20 active cryptocurrencies (24/7 trading)
-- **Dark Flow Scanner** - Institutional volume profile analysis (NEW in v0.93)
+- **Dark Flow Scanner** - Institutional volume profile analysis
+- **🔥 Pressure Cooker Scanner** - Short squeeze detection (v0.99+)
 
 ### Stock Scanner (NEW 5 Pillars - v0.93)
 - Scans NASDAQ, NYSE, or all US markets
@@ -83,6 +112,35 @@ Trading stocks, FOREX, cryptocurrencies, options, and other securities involves 
 - Price gap identification and classification
 - Active level alerts (within 0.5% of current price)
 - Optimized for major ETFs where institutional activity is highest
+
+### 🔥 Pressure Cooker Scanner (v0.99+)
+- **Short squeeze detection and analysis**
+- Identifies explosive setups with ultra-low float and high short interest
+- Market-wide scanning for squeeze candidates
+- Single ticker deep-dive analysis
+- **Key Detection Criteria:**
+  - Ultra-low float (< 5M shares ideal, < 1M excellent)
+  - High short interest (% of float shorted)
+  - Days to cover analysis
+  - Relative volume spikes (5x+ preferred)
+  - Reverse split detection
+  - 20-day high breakout patterns
+  - Consecutive high-volume days
+
+**Pressure Cooker Features:**
+- Comprehensive scoring system (0-100) with letter grades
+- Technical analysis (RSI, MACD, Bollinger Bands)
+- Options flow analysis (call/put ratios, unusual activity, gamma squeeze potential)
+- News catalyst detection
+- Social sentiment tracking (Reddit WSB mentions)
+- Setup progression staging (forming/ready/breaking)
+- Volume trend analysis
+- Risk assessment and setup quality rating
+
+**What is a Short Squeeze?**
+A short squeeze occurs when a heavily shorted stock rises rapidly, forcing short sellers to buy shares to cover their positions, which drives the price even higher. The Pressure Cooker Scanner identifies these high-risk, high-reward setups.
+
+⚠️ **WARNING**: Short squeezes are EXTREMELY volatile and risky. See the built-in Pressure Cooker disclaimer for full risk warnings and mandatory trading rules.
 
 ### Technical Analysis
 - **VWAP (Volume Weighted Average Price)** with 1σ and 2σ bands

@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0] - 2025-12-07
+
+### 🎉 STABLE RELEASE - Production Ready
+
+This release marks Trading Signal Analyzer as **production-ready** and **feature-complete** for the monolithic (single-file) version. All critical bugs have been fixed, and the codebase is stable for general use.
+
+### Fixed
+- **Export/Ticker Selection Flow** - Resolved confusing UX where export choice collided with ticker selection
+  - Added clear visual separators (80-character bars) between export and ticker selection prompts
+  - Applied to all three scanners: Momentum, Dark Flow, and Pressure Cooker
+  - Users can now clearly distinguish when they're exporting vs. selecting tickers for analysis
+  - Location: trading_signal_analyzer.py (multiple sections)
+
+- **Pressure Cooker Market Selection** - Removed inappropriate FOREX/Crypto options
+  - Pressure Cooker now only shows stock markets (US Stocks, NASDAQ, NYSE)
+  - FOREX and Crypto removed since they lack required squeeze mechanics data (float, short interest)
+  - Created stock-specific market selection function for squeeze scanner
+  - User feedback: "Are FOREX and crypto appropriate for the Pressure Cooker? I didn't think they were subject to the same sort of tracking"
+  - Location: trading_signal_analyzer.py (Pressure Cooker menu section)
+
+- **Pressure Cooker Single Ticker Analysis KeyError** - Fixed crash when analyzing specific ticker
+  - Removed line attempting to print non-existent 'summary' key from analysis result
+  - The PressureCookerScanner.analyze_ticker() method doesn't return a 'summary' field
+  - Display now correctly shows: score, grade, price, float, rel_vol, short_percent, setup_quality
+  - Error was: `KeyError: 'summary'` at line 3779
+  - Location: trading_signal_analyzer.py:3779
+
+### Status
+- **All known bugs fixed** ✅
+- **Feature complete for v1.0 scope** ✅
+- **Ready for production use** ✅
+
+### Notes
+- This is the **final release** of the monolithic (single-file) architecture
+- Future development will focus on the **v2.0 modular architecture** with:
+  - Polygon/Massive API integration
+  - SQLite database with scan history
+  - Support/Resistance and Volume Profile analysis
+  - Parallel processing for faster scans
+  - Watchlist and performance tracking
+- v1.0 will receive bug fixes only; new features will be added to v2.0
+
+### Migration Path
+- **Current users**: Continue using v1.0 - it's stable and fully functional
+- **New features**: Wait for v2.0 modular release (coming soon)
+- **Transition**: v2.0 will run alongside v1.0 (different deployment method)
+
+---
+
 ## [0.99] - 2025-12-02
 
 ### Added
