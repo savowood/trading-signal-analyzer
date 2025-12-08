@@ -262,7 +262,8 @@ def edit_settings_interactive(current_settings: dict) -> dict:
         print("2. Rate Limiting (workers, delays)")
         print("3. 5 Pillars Thresholds (change %, relative volume, float)")
         print("4. Display Settings (min score, max results)")
-        print("5. Save and Exit")
+        print("5. API Keys (FinViz, Polygon, etc.)")
+        print("6. Save and Exit")
         print("q. Cancel (don't save)")
         print("=" * 80)
 
@@ -277,6 +278,8 @@ def edit_settings_interactive(current_settings: dict) -> dict:
         elif choice == '4':
             current_settings = edit_display_settings(current_settings)
         elif choice == '5':
+            current_settings = edit_api_keys(current_settings)
+        elif choice == '6':
             print("\n✅ Settings will be saved")
             return current_settings
         elif choice == 'q':
@@ -483,4 +486,167 @@ def edit_display_settings(settings: dict) -> dict:
         except:
             print("   ❌ Invalid input, keeping current value")
 
+    return settings
+
+
+def edit_api_keys(settings: dict) -> dict:
+    """Edit API keys"""
+    print("\n" + "=" * 80)
+    print("API KEYS CONFIGURATION")
+    print("=" * 80)
+    print("\n⚠️  API keys are stored in plaintext in ~/.trading_analyzer")
+    print("   Keep this file secure and never commit it to version control")
+
+    api_keys = settings.get('api_keys', {})
+
+    # Define API key information
+    api_info = {
+        'finviz': {
+            'name': 'FinViz Elite',
+            'description': 'Faster, unlimited stock screening',
+            'url': 'https://elite.finviz.com/',
+            'required': False
+        },
+        'polygon': {
+            'name': 'Polygon.io',
+            'description': 'Real-time market data and dark pool prints',
+            'url': 'https://polygon.io/',
+            'required': False
+        },
+        'alphavantage': {
+            'name': 'Alpha Vantage',
+            'description': 'Additional market data and indicators',
+            'url': 'https://www.alphavantage.co/',
+            'required': False
+        },
+        'newsapi': {
+            'name': 'NewsAPI',
+            'description': 'News and catalyst detection',
+            'url': 'https://newsapi.org/',
+            'required': False
+        },
+        'tradingview': {
+            'name': 'TradingView',
+            'description': 'Enhanced TradingView integration',
+            'url': 'https://www.tradingview.com/',
+            'required': False
+        },
+        'reddit_client_id': {
+            'name': 'Reddit Client ID',
+            'description': 'Social sentiment analysis (requires client_secret too)',
+            'url': 'https://www.reddit.com/prefs/apps',
+            'required': False
+        },
+        'reddit_client_secret': {
+            'name': 'Reddit Client Secret',
+            'description': 'Social sentiment analysis (requires client_id too)',
+            'url': 'https://www.reddit.com/prefs/apps',
+            'required': False
+        }
+    }
+
+    while True:
+        print("\n" + "=" * 80)
+        print("Available API Keys:")
+        print("=" * 80)
+
+        # Show current status
+        for i, (key, info) in enumerate(api_info.items(), 1):
+            current_value = api_keys.get(key, '')
+            if current_value and current_value.strip():
+                # Mask the key
+                if len(current_value) > 12:
+                    masked = f"{current_value[:4]}...{current_value[-4:]}"
+                else:
+                    masked = f"{current_value[:2]}...{current_value[-2:]}" if len(current_value) > 4 else "***"
+                status = f"✅ Configured ({masked})"
+            else:
+                status = "❌ Not configured"
+
+            print(f"{i}. {info['name']}")
+            print(f"   {info['description']}")
+            print(f"   Status: {status}")
+            print(f"   Get key: {info['url']}")
+            print()
+
+        print("=" * 80)
+        print(f"{len(api_info) + 1}. Clear all API keys")
+        print(f"{len(api_info) + 2}. Back to settings menu")
+        print("=" * 80)
+
+        try:
+            choice = input("\nEnter number to edit/add API key: ").strip()
+
+            if not choice:
+                continue
+
+            choice_num = int(choice)
+
+            if choice_num == len(api_info) + 1:
+                # Clear all keys
+                confirm = input("\n⚠️  Clear ALL API keys? (yes/no): ").strip().lower()
+                if confirm == 'yes':
+                    api_keys = {key: '' for key in api_info.keys()}
+                    print("✅ All API keys cleared")
+                continue
+
+            elif choice_num == len(api_info) + 2:
+                # Back to menu
+                settings['api_keys'] = api_keys
+                return settings
+
+            elif 1 <= choice_num <= len(api_info):
+                # Edit specific key
+                key_name = list(api_info.keys())[choice_num - 1]
+                info = api_info[key_name]
+
+                print(f"\n{'=' * 80}")
+                print(f"Configure: {info['name']}")
+                print(f"{'=' * 80}")
+                print(f"Description: {info['description']}")
+                print(f"Get your API key: {info['url']}")
+
+                current = api_keys.get(key_name, '')
+                if current and current.strip():
+                    print(f"\nCurrent: {current[:4]}...{current[-4:] if len(current) > 8 else '***'}")
+                    print("\n1. Update API key")
+                    print("2. Remove API key")
+                    print("3. Keep current")
+
+                    action = input("\nChoice: ").strip()
+
+                    if action == '1':
+                        new_key = input(f"\nEnter new {info['name']} API key: ").strip()
+                        if new_key:
+                            api_keys[key_name] = new_key
+                            print(f"✅ {info['name']} API key updated")
+                        else:
+                            print("❌ Empty key, keeping current value")
+
+                    elif action == '2':
+                        api_keys[key_name] = ''
+                        print(f"✅ {info['name']} API key removed")
+
+                    elif action == '3':
+                        print("Keeping current value")
+
+                else:
+                    new_key = input(f"\nEnter {info['name']} API key (or press Enter to skip): ").strip()
+                    if new_key:
+                        api_keys[key_name] = new_key
+                        print(f"✅ {info['name']} API key added")
+                    else:
+                        print("Skipped")
+
+            else:
+                print("❌ Invalid choice")
+
+        except ValueError:
+            print("❌ Invalid input, please enter a number")
+        except KeyboardInterrupt:
+            print("\n\nReturning to settings menu...")
+            settings['api_keys'] = api_keys
+            return settings
+
+    settings['api_keys'] = api_keys
     return settings
