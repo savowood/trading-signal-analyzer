@@ -1,0 +1,26 @@
+# MANIFEST.in
+# Specifies additional files to include in the distribution package
+
+# Documentation
+include README.md
+include CHANGELOG.md
+include LICENSE
+include RELEASE_NOTES_v1.0.md
+include MIGRATION_GUIDE_v1_to_v2.md
+include POLYGON_SETUP_GUIDE.md
+
+# Configuration examples
+include trading_analyzer/config/*.json
+include trading_analyzer/config/*.example
+
+# Exclude development files
+exclude .gitignore
+exclude .github/*
+exclude tests/*
+exclude docs/*
+exclude examples/*
+exclude *.pyc
+exclude *.pyo
+exclude __pycache__
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

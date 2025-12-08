@@ -1,0 +1,107 @@
+# pyproject.toml
+# Modern Python packaging configuration (PEP 518)
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-signal-analyzer"
+version = "2.0.0-alpha.1"
+description = "Advanced multi-asset technical analysis and scanning tool for day trading"
+readme = "README.md"
+license = {text = "GPL-3.0"}
+authors = [
+    {name = "Michael Johnson", email = ""},
+]
+keywords = [
+    "trading", "stocks", "forex", "cryptocurrency", "technical-analysis",
+    "day-trading", "scanner", "momentum", "dark-flow", "short-squeeze"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "yfinance>=0.2.28",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "tradingview-screener>=0.1.0",
+    "rich>=13.0.0",
+    "openpyxl>=3.1.0",
+    "reportlab>=4.0.0",
+]
+
+[project.optional-dependencies]
+polygon = ["polygon-api-client>=1.14.0"]
+news = ["requests>=2.31.0"]
+social = ["praw>=7.7.0"]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+all = [
+    "polygon-api-client>=1.14.0",
+    "requests>=2.31.0",
+    "praw>=7.7.0",
+]
+
+[project.scripts]
+trading-analyzer = "trading_analyzer.main:main"
+tsa = "trading_analyzer.main:main"
+
+[project.urls]
+Homepage = "https://github.com/savowood/trading-signal-analyzer"
+Documentation = "https://github.com/savowood/trading-signal-analyzer/blob/v2.0-dev/README.md"
+Repository = "https://github.com/savowood/trading-signal-analyzer"
+Changelog = "https://github.com/savowood/trading-signal-analyzer/blob/v2.0-dev/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/savowood/trading-signal-analyzer/issues"
+Donate = "https://buymeacoffee.com/savowood"
+
+[tool.setuptools]
+packages = ["trading_analyzer"]
+
+[tool.setuptools.package-data]
+trading_analyzer = ["*.md", "data/*.json", "data/*.db"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --strict-markers"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
