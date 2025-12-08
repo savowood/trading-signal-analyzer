@@ -88,32 +88,32 @@ def main():
             run_pressure_cooker_scan()
 
         elif choice == '4':
+            # Analyze single ticker
+            analyze_single_ticker()
+
+        elif choice == '5':
             # View database statistics
             view_database_statistics()
 
-        elif choice == '5':
+        elif choice == '6':
             # Manage watchlist
             manage_watchlist()
 
-        elif choice == '6':
+        elif choice == '7':
             # View cache status
             view_cache_status(cache)
 
-        elif choice == '7':
+        elif choice == '8':
             # Clear cache
             clear_cache(cache)
 
-        elif choice == '8':
+        elif choice == '9':
             # View settings
             view_settings()
 
-        elif choice == '9':
+        elif choice == '0':
             # Edit settings
             edit_settings()
-
-        elif choice == '0':
-            # Create default settings file
-            create_settings_file()
 
         elif choice == 'q':
             print("\nGoodbye!")
@@ -676,6 +676,189 @@ def run_pressure_cooker_scan():
             print(f"\n❌ Scan error: {e}")
             import traceback
             traceback.print_exc()
+
+
+def analyze_single_ticker():
+    """Analyze a single ticker with comprehensive technical analysis"""
+    from .config import DEFAULT_TRADING_STYLE, DEFAULT_RR_RATIO, TRADING_STYLES
+    import yfinance as yf
+    import pandas as pd
+
+    print("\n" + "=" * 100)
+    print("📈 SINGLE TICKER ANALYSIS")
+    print("=" * 100)
+
+    # Get ticker input
+    ticker = input("\nEnter ticker symbol (e.g., AAPL, TSLA): ").strip().upper()
+
+    if not ticker:
+        print("❌ No ticker entered")
+        return
+
+    try:
+        print(f"\n🔍 Analyzing {ticker}...")
+        stock = yf.Ticker(ticker)
+
+        # Get trading style settings
+        style_config = TRADING_STYLES[DEFAULT_TRADING_STYLE]
+        rr_ratio = DEFAULT_RR_RATIO
+
+        # Fetch data
+        info = stock.info
+        hist = stock.history(period=style_config['chart_period'], interval=style_config['chart_interval'])
+
+        if hist.empty:
+            print(f"❌ No data available for {ticker}")
+            return
+
+        # Current price and basic info
+        current_price = hist['Close'].iloc[-1]
+        prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+        change = current_price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+
+        # Volume analysis
+        current_volume = hist['Volume'].iloc[-1]
+        avg_volume = hist['Volume'].tail(20).mean()
+        rel_vol = current_volume / avg_volume if avg_volume > 0 else 1.0
+
+        # Price analysis
+        day_high = hist['High'].iloc[-1]
+        day_low = hist['Low'].iloc[-1]
+        week_high = hist['High'].tail(5).max()
+        week_low = hist['Low'].tail(5).min()
+
+        # Support/Resistance
+        recent_data = hist.tail(20)
+        support = float(recent_data['Low'].min())
+        resistance = float(recent_data['High'].max())
+
+        # Calculate R:R levels
+        risk = current_price - support
+        reward = risk * rr_ratio
+        target = current_price + reward
+
+        # Display analysis
+        print("\n" + "=" * 100)
+        print(f"📊 {ticker} - {info.get('longName', ticker)}")
+        print("=" * 100)
+
+        # Price Section
+        print(f"\n💰 PRICE INFORMATION")
+        print(f"   Current:        ${current_price:.2f}")
+        print(f"   Change:         ${change:+.2f} ({change_pct:+.2f}%)")
+        print(f"   Day Range:      ${day_low:.2f} - ${day_high:.2f}")
+        print(f"   Week Range:     ${week_low:.2f} - ${week_high:.2f}")
+
+        # Volume Section
+        print(f"\n📊 VOLUME ANALYSIS")
+        print(f"   Current Volume: {current_volume:,.0f}")
+        print(f"   Avg Volume:     {avg_volume:,.0f}")
+        print(f"   Relative Vol:   {rel_vol:.2f}x")
+
+        # Technical Levels
+        print(f"\n📈 TECHNICAL LEVELS")
+        print(f"   Support:        ${support:.2f}")
+        print(f"   Resistance:     ${resistance:.2f}")
+        print(f"   Range:          ${resistance - support:.2f}")
+
+        # R:R Analysis
+        print(f"\n🎯 RISK/REWARD ANALYSIS (1:{rr_ratio:.1f})")
+        print(f"   Entry:          ${current_price:.2f}")
+        print(f"   Stop Loss:      ${support:.2f}")
+        print(f"   Target:         ${target:.2f}")
+        print(f"   Risk:           ${risk:.2f}")
+        print(f"   Reward:         ${reward:.2f}")
+
+        # Additional Info
+        if info.get('marketCap'):
+            market_cap = info['marketCap'] / 1_000_000_000
+            print(f"\n💼 COMPANY INFO")
+            print(f"   Market Cap:     ${market_cap:.2f}B")
+            if info.get('floatShares'):
+                float_shares = info['floatShares'] / 1_000_000
+                print(f"   Float:          {float_shares:.2f}M shares")
+            if info.get('sector'):
+                print(f"   Sector:         {info['sector']}")
+            if info.get('industry'):
+                print(f"   Industry:       {info['industry']}")
+
+        # Technical Indicators
+        print(f"\n📉 TECHNICAL INDICATORS")
+
+        # Calculate MACD
+        try:
+            exp1 = hist['Close'].ewm(span=12, adjust=False).mean()
+            exp2 = hist['Close'].ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            macd_current = macd.iloc[-1]
+            signal_current = signal.iloc[-1]
+            macd_cross = "BULLISH ✅" if macd_current > signal_current else "BEARISH ⚠️"
+            print(f"   MACD:           {macd_current:.2f} / {signal_current:.2f} - {macd_cross}")
+        except:
+            pass
+
+        # Calculate RSI
+        try:
+            delta = hist['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            rsi_current = rsi.iloc[-1]
+            rsi_signal = "OVERSOLD 🟢" if rsi_current < 30 else "OVERBOUGHT 🔴" if rsi_current > 70 else "NEUTRAL"
+            print(f"   RSI(14):        {rsi_current:.2f} - {rsi_signal}")
+        except:
+            pass
+
+        # Calculate VWAP
+        try:
+            typical_price = (hist['High'] + hist['Low'] + hist['Close']) / 3
+            vwap = (typical_price * hist['Volume']).cumsum() / hist['Volume'].cumsum()
+            vwap_current = vwap.iloc[-1]
+            vwap_signal = "ABOVE VWAP ✅" if current_price > vwap_current else "BELOW VWAP ⚠️"
+            print(f"   VWAP:           ${vwap_current:.2f} - {vwap_signal}")
+        except:
+            pass
+
+        # Moving Averages
+        try:
+            sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1]
+            sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1] if len(hist) >= 50 else None
+            print(f"   SMA(20):        ${sma_20:.2f} - {'ABOVE ✅' if current_price > sma_20 else 'BELOW ⚠️'}")
+            if sma_50:
+                print(f"   SMA(50):        ${sma_50:.2f} - {'ABOVE ✅' if current_price > sma_50 else 'BELOW ⚠️'}")
+        except:
+            pass
+
+        print("\n" + "=" * 100)
+
+        # Offer chart display
+        print("\nOptions:")
+        print("1. View ASCII chart")
+        print("2. Back to main menu")
+
+        choice = input("\nEnter choice: ").strip()
+
+        if choice == '1':
+            chart_gen = ASCIIChartGenerator()
+            sr_levels = {
+                'nearest_support': support,
+                'nearest_resistance': resistance
+            }
+            chart_gen.plot_price_chart(
+                hist,
+                ticker,
+                sr_levels=sr_levels,
+                rr_ratio=rr_ratio
+            )
+            input("\nPress Enter to continue...")
+
+    except Exception as e:
+        print(f"\n❌ Error analyzing {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def view_database_statistics():
