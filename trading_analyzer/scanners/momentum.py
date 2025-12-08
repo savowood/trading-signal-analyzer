@@ -86,6 +86,10 @@ class MomentumScanner(CompositeScanner):
         if self.finviz:
             print(f"   💎 Using FinViz Elite API (faster, unlimited results)")
             tv_results = self.finviz.scan(params)
+            # Enrich FinViz results with accurate data from yfinance
+            if tv_results:
+                print(f"   📊 Enriching {len(tv_results)} results with detailed data...")
+                tv_results = self._enrich_results(tv_results, params)
         else:
             tv_results = self.tradingview.scan(params)
 
@@ -209,6 +213,49 @@ class MomentumScanner(CompositeScanner):
         ]
 
         self.cache.set('scan_results', cache_key, results_dict)
+
+    def _enrich_results(self, results: List[ScanResult], params: ScanParameters) -> List[ScanResult]:
+        """Enrich results with accurate data from yfinance"""
+        import yfinance as yf
+
+        enriched = []
+        for result in results:
+            try:
+                # Fetch real data from yfinance
+                ticker = yf.Ticker(result.ticker)
+                info = ticker.info
+                hist = ticker.history(period='1mo')
+
+                if hist.empty or len(hist) < 20:
+                    continue
+
+                # Get accurate relative volume
+                current_volume = hist['Volume'].iloc[-1]
+                avg_volume = hist['Volume'].tail(20).mean()
+                rel_vol = current_volume / avg_volume if avg_volume > 0 else 1.0
+
+                # Get accurate float
+                float_shares = info.get('floatShares', info.get('sharesOutstanding', 0))
+                float_m = float_shares / 1_000_000 if float_shares else 0
+
+                # Apply filters with real data
+                if rel_vol < params.min_rel_vol:
+                    continue
+                if float_m > params.max_float:
+                    continue
+
+                # Update result with accurate data
+                result.rel_vol = rel_vol
+                result.float_m = float_m
+                result.low_float = 0 < float_m < 20
+
+                enriched.append(result)
+
+            except Exception as e:
+                # If enrichment fails, skip this result
+                continue
+
+        return enriched
 
 
 def create_scanner() -> MomentumScanner:
