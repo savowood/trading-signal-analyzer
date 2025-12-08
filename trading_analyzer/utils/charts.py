@@ -48,15 +48,19 @@ class ASCIIChartGenerator:
                         hist: pd.DataFrame,
                         ticker: str,
                         sr_levels: Optional[dict] = None,
-                        vp_data: Optional[dict] = None):
+                        vp_data: Optional[dict] = None,
+                        entry_price: Optional[float] = None,
+                        rr_ratio: float = 2.0):
         """
-        Plot price chart with volume, S/R levels, and volume profile
+        Plot price chart with volume, S/R levels, volume profile, and R:R targets
 
         Args:
             hist: Historical OHLCV data
             ticker: Stock symbol
             sr_levels: Support/resistance levels dict
             vp_data: Volume profile data dict
+            entry_price: Entry price for R:R calculation (defaults to current price)
+            rr_ratio: Risk/Reward ratio (e.g., 2.0 for 1:2)
         """
         if not RICH_AVAILABLE:
             print("⚠️  Install 'rich' library: pip install rich")
@@ -80,6 +84,23 @@ class ASCIIChartGenerator:
         # Normalize data for display
         price_min, price_max = prices.min(), prices.max()
         price_range = price_max - price_min if price_max > price_min else 1
+
+        # Calculate R:R levels if entry price provided
+        rr_levels = {}
+        if entry_price is None:
+            entry_price = prices[-1]  # Use current price
+
+        if sr_levels and sr_levels.get('nearest_support'):
+            stop_loss = sr_levels['nearest_support']
+            risk = abs(entry_price - stop_loss)
+            take_profit = entry_price + (risk * rr_ratio)
+            rr_levels = {
+                'entry': entry_price,
+                'stop': stop_loss,
+                'target': take_profit,
+                'risk': risk,
+                'reward': risk * rr_ratio
+            }
 
         # Create chart
         chart_lines = []
@@ -140,6 +161,18 @@ class ASCIIChartGenerator:
                     if abs(price_level - vp_data['poc_price']) < tolerance:
                         char = "•"
                         style = "cyan bold"
+
+                # Mark R:R levels
+                if rr_levels:
+                    if abs(price_level - rr_levels['entry']) < tolerance:
+                        char = "▶"
+                        style = "white bold"
+                    elif abs(price_level - rr_levels['target']) < tolerance:
+                        char = "─"
+                        style = "green bold"
+                    elif abs(price_level - rr_levels['stop']) < tolerance:
+                        char = "─"
+                        style = "red bold"
 
                 line.append(char, style=style)
 
@@ -204,6 +237,14 @@ class ASCIIChartGenerator:
         if vp_data and vp_data.get('poc_price'):
             indicators.append("\n")
             indicators.append(f"POC: ${vp_data['poc_price']:.2f} ", style="cyan")
+
+        # Show R:R levels
+        if rr_levels:
+            indicators.append("\n")
+            indicators.append(f"Entry: ${rr_levels['entry']:.2f} ▶ ", style="white bold")
+            indicators.append(f"Target: ${rr_levels['target']:.2f} ", style="green bold")
+            indicators.append(f"Stop: ${rr_levels['stop']:.2f} ", style="red bold")
+            indicators.append(f"(1:{rr_ratio:.1f} R:R)", style="dim")
 
         # === ASSEMBLE PANEL ===
         # Combine all Text objects properly to preserve colors

@@ -295,6 +295,88 @@ MIN_SCORE = 50  # Out of 100
 # Display settings
 MAX_RESULTS_DISPLAY = 50
 
+# Trading styles with typical timeframes
+TRADING_STYLES = {
+    'scalper': {
+        'name': 'Scalper',
+        'description': 'Quick in-and-out trades',
+        'typical_duration': 'Minutes to hours',
+        'hold_time': '1m - 4h',
+        'chart_period': '5d',           # 5 days of data
+        'chart_interval': '5m',         # 5-minute candles
+        'default_rr': 2.0,              # 1:2 risk/reward
+        'indicators': ['VWAP', 'Level 2', 'Tape Reading']
+    },
+    'day_trader': {
+        'name': 'Day Trader',
+        'description': 'Same-day trades, close before market close',
+        'typical_duration': 'Hours (same day)',
+        'hold_time': '30m - 6h',
+        'chart_period': '1mo',          # 1 month of data
+        'chart_interval': '15m',        # 15-minute candles
+        'default_rr': 2.0,              # 1:2 risk/reward
+        'indicators': ['VWAP', 'MACD', 'RSI', 'Volume']
+    },
+    'swing_trader': {
+        'name': 'Swing Trader',
+        'description': 'Multi-day trades capturing swings',
+        'typical_duration': 'Days to weeks',
+        'hold_time': '2 days - 3 weeks',
+        'chart_period': '3mo',          # 3 months of data
+        'chart_interval': '1d',         # Daily candles
+        'default_rr': 3.0,              # 1:3 risk/reward
+        'indicators': ['Support/Resistance', 'Moving Averages', 'MACD']
+    },
+    'position_trader': {
+        'name': 'Position Trader',
+        'description': 'Medium-term trend following',
+        'typical_duration': 'Weeks to months',
+        'hold_time': '3 weeks - 6 months',
+        'chart_period': '1y',           # 1 year of data
+        'chart_interval': '1d',         # Daily candles
+        'default_rr': 3.0,              # 1:3 risk/reward
+        'indicators': ['Moving Averages', 'Trend Lines', 'Volume Profile']
+    },
+    'long_term': {
+        'name': 'Long-term Investor',
+        'description': 'Buy and hold for extended periods',
+        'typical_duration': 'Months to years',
+        'hold_time': '6 months - 5+ years',
+        'chart_period': '5y',           # 5 years of data
+        'chart_interval': '1wk',        # Weekly candles
+        'default_rr': 5.0,              # 1:5 risk/reward
+        'indicators': ['Fundamentals', 'Long-term Trends', 'Dividends']
+    }
+}
+
+# Risk/Reward ratio presets
+RR_RATIOS = {
+    'conservative': {
+        'name': 'Conservative (1:1)',
+        'ratio': 1.0,
+        'description': 'Equal risk and reward'
+    },
+    'balanced': {
+        'name': 'Balanced (1:2)',
+        'ratio': 2.0,
+        'description': 'Risk $1 to make $2'
+    },
+    'aggressive': {
+        'name': 'Aggressive (1:3)',
+        'ratio': 3.0,
+        'description': 'Risk $1 to make $3'
+    },
+    'very_aggressive': {
+        'name': 'Very Aggressive (1:5)',
+        'ratio': 5.0,
+        'description': 'Risk $1 to make $5'
+    }
+}
+
+# Default trading style
+DEFAULT_TRADING_STYLE = 'day_trader'
+DEFAULT_RR_RATIO = 2.0
+
 
 # ============================================================================
 # SETTINGS FILE SUPPORT
@@ -337,6 +419,7 @@ def load_user_settings() -> Dict[str, Any]:
 def apply_user_settings(settings: Dict[str, Any]):
     """Apply user settings to override defaults"""
     global CACHE_SETTINGS, RATE_LIMIT, PILLARS, MIN_SCORE, MAX_RESULTS_DISPLAY, API_KEYS
+    global DEFAULT_TRADING_STYLE, DEFAULT_RR_RATIO
 
     # Apply cache settings
     if 'cache_settings' in settings:
@@ -363,6 +446,14 @@ def apply_user_settings(settings: Dict[str, Any]):
     if 'max_results_display' in settings:
         MAX_RESULTS_DISPLAY = settings['max_results_display']
 
+    # Apply trading preferences
+    if 'trading_style' in settings:
+        if settings['trading_style'] in TRADING_STYLES:
+            DEFAULT_TRADING_STYLE = settings['trading_style']
+
+    if 'rr_ratio' in settings:
+        DEFAULT_RR_RATIO = float(settings['rr_ratio'])
+
     # Apply API keys
     if 'api_keys' in settings:
         for key, value in settings['api_keys'].items():
@@ -377,6 +468,8 @@ def create_default_settings_file():
         "_note": "Customize these values to override defaults",
         "disclaimer_acknowledged": False,
         "pressure_cooker_disclaimer_acknowledged": False,
+        "trading_style": "day_trader",
+        "rr_ratio": 2.0,
         "cache_settings": {
             "scan_results": 900,
             "microcap_list": 14400,
@@ -409,6 +502,24 @@ def create_default_settings_file():
         },
         "min_score": 50,
         "max_results_display": 50,
+        "trading_preferences": {
+            "_note": "Customize your trading style and risk management",
+            "trading_styles": {
+                "scalper": "Minutes to hours (1m - 4h)",
+                "day_trader": "Hours, same day (30m - 6h)",
+                "swing_trader": "Days to weeks (2 days - 3 weeks)",
+                "position_trader": "Weeks to months (3 weeks - 6 months)",
+                "long_term": "Months to years (6 months - 5+ years)"
+            },
+            "selected_style": "day_trader",
+            "rr_ratio": 2.0,
+            "rr_ratio_presets": {
+                "conservative": 1.0,
+                "balanced": 2.0,
+                "aggressive": 3.0,
+                "very_aggressive": 5.0
+            }
+        },
         "api_keys": {
             "_note": "Add your API keys here to enable enhanced features",
             "finviz": "",
@@ -491,5 +602,7 @@ def get_settings_info() -> Dict[str, Any]:
         'pillars': PILLARS.copy(),
         'min_score': MIN_SCORE,
         'max_results_display': MAX_RESULTS_DISPLAY,
+        'trading_style': DEFAULT_TRADING_STYLE,
+        'rr_ratio': DEFAULT_RR_RATIO,
         'api_keys': api_key_status
     }

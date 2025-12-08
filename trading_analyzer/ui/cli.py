@@ -258,28 +258,31 @@ def edit_settings_interactive(current_settings: dict) -> dict:
     while True:
         print("\nWhat would you like to edit?")
         print("=" * 80)
-        print("1. Cache Settings (scan results, microcap list, stock data)")
-        print("2. Rate Limiting (workers, delays)")
-        print("3. 5 Pillars Thresholds (change %, relative volume, float)")
-        print("4. Display Settings (min score, max results)")
-        print("5. API Keys (FinViz, Polygon, etc.)")
-        print("6. Save and Exit")
+        print("1. Trading Style & Risk Management")
+        print("2. Cache Settings (scan results, microcap list, stock data)")
+        print("3. Rate Limiting (workers, delays)")
+        print("4. 5 Pillars Thresholds (change %, relative volume, float)")
+        print("5. Display Settings (min score, max results)")
+        print("6. API Keys (FinViz, Polygon, etc.)")
+        print("7. Save and Exit")
         print("q. Cancel (don't save)")
         print("=" * 80)
 
         choice = input("\nEnter choice: ").strip().lower()
 
         if choice == '1':
-            current_settings = edit_cache_settings(current_settings)
+            current_settings = edit_trading_style_settings(current_settings)
         elif choice == '2':
-            current_settings = edit_rate_limit_settings(current_settings)
+            current_settings = edit_cache_settings(current_settings)
         elif choice == '3':
-            current_settings = edit_pillars_settings(current_settings)
+            current_settings = edit_rate_limit_settings(current_settings)
         elif choice == '4':
-            current_settings = edit_display_settings(current_settings)
+            current_settings = edit_pillars_settings(current_settings)
         elif choice == '5':
-            current_settings = edit_api_keys(current_settings)
+            current_settings = edit_display_settings(current_settings)
         elif choice == '6':
+            current_settings = edit_api_keys(current_settings)
+        elif choice == '7':
             print("\n✅ Settings will be saved")
             return current_settings
         elif choice == 'q':
@@ -287,6 +290,104 @@ def edit_settings_interactive(current_settings: dict) -> dict:
             return None
         else:
             print("❌ Invalid choice")
+
+
+def edit_trading_style_settings(settings: dict) -> dict:
+    """Edit trading style and risk management settings"""
+    from ..config import TRADING_STYLES, RR_RATIOS
+
+    print("\n" + "=" * 80)
+    print("TRADING STYLE & RISK MANAGEMENT")
+    print("=" * 80)
+
+    # Trading Style Selection
+    print("\n1. Select Your Trading Style:")
+    print("=" * 80)
+
+    current_style = settings.get('trading_style', 'day_trader')
+    styles_list = list(TRADING_STYLES.keys())
+
+    for i, (key, style) in enumerate(TRADING_STYLES.items(), 1):
+        marker = "→" if key == current_style else " "
+        print(f"{marker} {i}. {style['name']:<20} | {style['typical_duration']:<20} | Hold: {style['hold_time']}")
+        print(f"   {style['description']}")
+        print()
+
+    print(f"Current: {TRADING_STYLES[current_style]['name']}")
+    change = input("\nChange trading style? (y/n): ").strip().lower()
+
+    if change == 'y':
+        try:
+            choice = int(input(f"Select style (1-{len(styles_list)}): ").strip())
+            if 1 <= choice <= len(styles_list):
+                new_style = styles_list[choice - 1]
+                settings['trading_style'] = new_style
+                print(f"✅ Trading style set to: {TRADING_STYLES[new_style]['name']}")
+            else:
+                print("❌ Invalid choice, keeping current style")
+        except:
+            print("❌ Invalid input, keeping current style")
+
+    # R:R Ratio Selection
+    print("\n2. Risk/Reward Ratio:")
+    print("=" * 80)
+
+    current_rr = settings.get('rr_ratio', 2.0)
+    print(f"\nCurrent R:R Ratio: 1:{current_rr:.1f}")
+    print("   (Risk $1 to make ${:.0f})".format(current_rr))
+
+    print("\nPresets:")
+    for i, (key, rr) in enumerate(RR_RATIOS.items(), 1):
+        marker = "→" if rr['ratio'] == current_rr else " "
+        print(f"{marker} {i}. {rr['name']:<25} - {rr['description']}")
+
+    print(f"\n{len(RR_RATIOS) + 1}. Custom ratio")
+
+    change = input("\nChange R:R ratio? (y/n): ").strip().lower()
+
+    if change == 'y':
+        try:
+            choice = int(input(f"Select option (1-{len(RR_RATIOS) + 1}): ").strip())
+
+            if 1 <= choice <= len(RR_RATIOS):
+                # Preset selected
+                rr_list = list(RR_RATIOS.values())
+                new_rr = rr_list[choice - 1]['ratio']
+                settings['rr_ratio'] = new_rr
+                print(f"✅ R:R ratio set to 1:{new_rr:.1f}")
+
+            elif choice == len(RR_RATIOS) + 1:
+                # Custom ratio
+                custom = float(input("Enter custom R:R ratio (e.g., 2.5 for 1:2.5): ").strip())
+                if 0.5 <= custom <= 10.0:
+                    settings['rr_ratio'] = custom
+                    print(f"✅ Custom R:R ratio set to 1:{custom:.1f}")
+                else:
+                    print("❌ Ratio must be between 0.5 and 10.0")
+
+            else:
+                print("❌ Invalid choice, keeping current ratio")
+
+        except:
+            print("❌ Invalid input, keeping current ratio")
+
+    # Summary
+    final_style = settings.get('trading_style', 'day_trader')
+    final_rr = settings.get('rr_ratio', 2.0)
+    style_info = TRADING_STYLES[final_style]
+
+    print("\n" + "=" * 80)
+    print("TRADING PREFERENCES SUMMARY")
+    print("=" * 80)
+    print(f"Style:        {style_info['name']}")
+    print(f"Duration:     {style_info['typical_duration']}")
+    print(f"Hold Time:    {style_info['hold_time']}")
+    print(f"R:R Ratio:    1:{final_rr:.1f}")
+    print(f"Charts:       {style_info['chart_period']} period, {style_info['chart_interval']} interval")
+    print(f"Indicators:   {', '.join(style_info['indicators'])}")
+    print("=" * 80)
+
+    return settings
 
 
 def edit_cache_settings(settings: dict) -> dict:

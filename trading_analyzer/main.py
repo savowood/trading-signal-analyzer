@@ -481,6 +481,15 @@ def view_settings():
     print(f"  Min Score: {settings_info['min_score']}")
     print(f"  Max Results: {settings_info['max_results_display']}")
 
+    print(f"\n📈 Trading Preferences:")
+    from .config import TRADING_STYLES
+    style_key = settings_info.get('trading_style', 'day_trader')
+    style_info = TRADING_STYLES.get(style_key, TRADING_STYLES['day_trader'])
+    rr_ratio = settings_info.get('rr_ratio', 2.0)
+    print(f"  Style: {style_info['name']}")
+    print(f"  Duration: {style_info['typical_duration']}")
+    print(f"  R:R Ratio: 1:{rr_ratio:.1f}")
+
     print(f"\n🔑 API Keys:")
     for key, status in settings_info.get('api_keys', {}).items():
         print(f"  {key}: {status}")
@@ -902,6 +911,8 @@ def offer_chart_display(tickers: List[str]):
     if not tickers:
         return
 
+    from .config import DEFAULT_TRADING_STYLE, DEFAULT_RR_RATIO, TRADING_STYLES
+
     print("\n" + "=" * 80)
     print("📊 CHART DISPLAY OPTIONS")
     print("=" * 80)
@@ -915,7 +926,16 @@ def offer_chart_display(tickers: List[str]):
 
     try:
         import yfinance as yf
+        from .analysis.technical import analyze_stock  # For S/R levels
         chart_gen = ASCIIChartGenerator()
+
+        # Get trading style settings
+        style_config = TRADING_STYLES[DEFAULT_TRADING_STYLE]
+        chart_period = style_config['chart_period']
+        rr_ratio = DEFAULT_RR_RATIO
+
+        print(f"\n📋 Using {style_config['name']} settings:")
+        print(f"   Period: {chart_period} | Interval: {style_config['chart_interval']} | R:R: 1:{rr_ratio:.1f}")
 
         for ticker in tickers:
             print(f"\n{'=' * 100}")
@@ -924,10 +944,22 @@ def offer_chart_display(tickers: List[str]):
 
             try:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(period="3mo")
+                hist = stock.history(period=chart_period, interval=style_config['chart_interval'])
 
                 if not hist.empty:
-                    chart_gen.plot_price_chart(hist, ticker)
+                    # Try to get S/R levels for R:R calculation
+                    try:
+                        analysis = analyze_stock(ticker)
+                        sr_levels = analysis.get('support_resistance', {})
+                    except:
+                        sr_levels = None
+
+                    chart_gen.plot_price_chart(
+                        hist,
+                        ticker,
+                        sr_levels=sr_levels,
+                        rr_ratio=rr_ratio
+                    )
                 else:
                     print(f"❌ No data available for {ticker}")
 
