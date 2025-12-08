@@ -234,6 +234,9 @@ class MomentumScanner(CompositeScanner):
         rate_limited = 0
         total = len(results)
 
+        # Check if using FinViz Elite (already pre-filtered)
+        using_finviz = len(results) > 0 and results[0].source == "FinViz Elite"
+
         for i, result in enumerate(results, 1):
             try:
                 # Show progress (cleaner output)
@@ -249,23 +252,38 @@ class MomentumScanner(CompositeScanner):
                 hist = ticker.history(period='1mo')
 
                 if hist.empty or len(hist) < 20:
-                    filtered_out += 1
-                    continue
+                    # Skip if insufficient data, but keep FinViz Elite results
+                    if not using_finviz:
+                        filtered_out += 1
+                        continue
+                    else:
+                        # Keep FinViz result with original data
+                        enriched.append(result)
+                        continue
 
                 # Get accurate relative volume
                 current_volume = hist['Volume'].iloc[-1]
                 avg_volume = hist['Volume'].tail(20).mean()
-                rel_vol = current_volume / avg_volume if avg_volume > 0 else 1.0
+                rel_vol = current_volume / avg_volume if avg_volume > 0 else result.rel_vol
 
                 # Get accurate float
                 float_shares = info.get('floatShares', info.get('sharesOutstanding', 0))
-                float_m = float_shares / 1_000_000 if float_shares else 0
+                float_m = float_shares / 1_000_000 if float_shares else result.float_m
+
+                # For FinViz Elite results, be lenient (80% threshold) since already pre-filtered
+                # For TradingView, use strict filters
+                if using_finviz:
+                    min_rel_vol_threshold = params.min_rel_vol * 0.8
+                    max_float_threshold = params.max_float * 1.2
+                else:
+                    min_rel_vol_threshold = params.min_rel_vol
+                    max_float_threshold = params.max_float
 
                 # Apply filters with real data
-                if rel_vol < params.min_rel_vol:
+                if rel_vol < min_rel_vol_threshold:
                     filtered_out += 1
                     continue
-                if float_m > params.max_float:
+                if float_m > max_float_threshold:
                     filtered_out += 1
                     continue
 
@@ -280,7 +298,11 @@ class MomentumScanner(CompositeScanner):
                 error_msg = str(e)
                 if "Rate limit" in error_msg or "Too Many Requests" in error_msg:
                     rate_limited += 1
-                filtered_out += 1
+                # Keep FinViz results even if enrichment fails
+                if using_finviz:
+                    enriched.append(result)
+                else:
+                    filtered_out += 1
                 continue
 
         # Clear progress line and show summary

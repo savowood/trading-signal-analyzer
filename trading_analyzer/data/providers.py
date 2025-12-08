@@ -321,17 +321,29 @@ class FinVizProvider(Scanner):
             return []
 
     def _build_filter_string(self, params: ScanParameters) -> str:
-        """Build FinViz filter string for URL"""
+        """Build FinViz filter string for URL based on scan parameters"""
         filters = []
 
-        # Change (positive)
-        filters.append("ta_change_u")
+        # Price range: over min_price (FinViz uses integer thresholds)
+        if params.min_price >= 2:
+            filters.append("sh_price_o2")
+        elif params.min_price >= 5:
+            filters.append("sh_price_o5")
 
-        # Volume (1M+)
-        filters.append("sh_avgvol_o1000")
+        # Relative volume: 5x+ (matches our min_rel_vol)
+        filters.append("sh_relvol_o5")
 
-        # Optionable (quality filter)
-        filters.append("sh_opt_option")
+        # Float: under max_float (default 20M)
+        if params.max_float <= 20:
+            filters.append("sh_float_u20")
+        elif params.max_float <= 50:
+            filters.append("sh_float_u50")
+
+        # Change: up 10%+ (matches our min_change)
+        filters.append("ta_change_u10")
+
+        # Current volume: over 500K (liquidity filter)
+        filters.append("sh_curvol_o500")
 
         # Join with commas
         return ','.join(filters)
