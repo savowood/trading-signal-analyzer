@@ -86,12 +86,13 @@ class MomentumScanner(CompositeScanner):
         if self.finviz:
             print(f"   💎 Using FinViz Elite API (faster, unlimited results)")
             tv_results = self.finviz.scan(params)
-            # Enrich FinViz results with accurate data from yfinance
-            if tv_results:
-                print(f"   📊 Enriching {len(tv_results)} results with detailed data...")
-                tv_results = self._enrich_results(tv_results, params)
         else:
             tv_results = self.tradingview.scan(params)
+
+        # Enrich ALL results with accurate data from yfinance
+        if tv_results:
+            print(f"   📊 Enriching {len(tv_results)} results with detailed data...")
+            tv_results = self._enrich_results(tv_results, params)
 
         # Step 2: Micro-cap scan (skip for QUICK mode)
         mc_results = []
@@ -219,14 +220,23 @@ class MomentumScanner(CompositeScanner):
         import yfinance as yf
 
         enriched = []
-        for result in results:
+        total = len(results)
+
+        print(f"      Starting enrichment of {total} stocks...")
+
+        for i, result in enumerate(results, 1):
             try:
+                # Show progress
+                if i % 5 == 0 or i == total:
+                    print(f"      Processing {i}/{total} ({result.ticker})...", end='\r')
+
                 # Fetch real data from yfinance
                 ticker = yf.Ticker(result.ticker)
                 info = ticker.info
                 hist = ticker.history(period='1mo')
 
                 if hist.empty or len(hist) < 20:
+                    print(f"      ⚠️  {result.ticker}: Insufficient data (<20 days)")
                     continue
 
                 # Get accurate relative volume
@@ -238,10 +248,16 @@ class MomentumScanner(CompositeScanner):
                 float_shares = info.get('floatShares', info.get('sharesOutstanding', 0))
                 float_m = float_shares / 1_000_000 if float_shares else 0
 
+                # Debug output for first few stocks
+                if i <= 3:
+                    print(f"\n      📊 {result.ticker}: RelVol={rel_vol:.1f}x, Float={float_m:.1f}M")
+
                 # Apply filters with real data
                 if rel_vol < params.min_rel_vol:
+                    print(f"      ⚠️  {result.ticker}: RelVol {rel_vol:.1f}x < {params.min_rel_vol}x (filtered out)")
                     continue
                 if float_m > params.max_float:
+                    print(f"      ⚠️  {result.ticker}: Float {float_m:.1f}M > {params.max_float}M (filtered out)")
                     continue
 
                 # Update result with accurate data
@@ -252,9 +268,10 @@ class MomentumScanner(CompositeScanner):
                 enriched.append(result)
 
             except Exception as e:
-                # If enrichment fails, skip this result
+                print(f"      ❌ {result.ticker}: Enrichment failed - {str(e)[:50]}")
                 continue
 
+        print(f"\n      ✅ Enrichment complete: {len(enriched)} of {total} stocks meet all criteria")
         return enriched
 
 

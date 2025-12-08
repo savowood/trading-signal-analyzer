@@ -145,8 +145,8 @@ def run_scan(scanner):
         if not results:
             return
 
-        # Offer export options
-        offer_export_options(results, scanner_type='momentum')
+        # Export options removed for cleaner workflow
+        # User can manually export if needed via menu option
 
         # Clear separator before ticker selection
         print("\n" + "=" * 80)
