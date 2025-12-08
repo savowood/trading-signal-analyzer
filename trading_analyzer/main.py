@@ -926,7 +926,6 @@ def offer_chart_display(tickers: List[str]):
 
     try:
         import yfinance as yf
-        from .analysis.technical import analyze_stock  # For S/R levels
         chart_gen = ASCIIChartGenerator()
 
         # Get trading style settings
@@ -947,12 +946,18 @@ def offer_chart_display(tickers: List[str]):
                 hist = stock.history(period=chart_period, interval=style_config['chart_interval'])
 
                 if not hist.empty:
-                    # Try to get S/R levels for R:R calculation
+                    # Calculate basic S/R levels from price data
+                    sr_levels = None
                     try:
-                        analysis = analyze_stock(ticker)
-                        sr_levels = analysis.get('support_resistance', {})
+                        # Simple S/R: use recent high/low as resistance/support
+                        recent_data = hist.tail(20)  # Last 20 periods
+                        if len(recent_data) > 0:
+                            sr_levels = {
+                                'nearest_support': float(recent_data['Low'].min()),
+                                'nearest_resistance': float(recent_data['High'].max())
+                            }
                     except:
-                        sr_levels = None
+                        pass  # If S/R calculation fails, chart will work without it
 
                     chart_gen.plot_price_chart(
                         hist,
