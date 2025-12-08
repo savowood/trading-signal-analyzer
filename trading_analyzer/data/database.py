@@ -163,6 +163,9 @@ class DatabaseManager:
                 )
             """)
 
+            # Migrate existing tables (add missing columns)
+            self._migrate_schema(cursor)
+
             # Performance tracking table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS performance_tracking (
@@ -198,6 +201,17 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_status ON watchlist(status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_performance_ticker ON performance_tracking(ticker)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_performance_date ON performance_tracking(signal_date DESC)")
+
+    def _migrate_schema(self, cursor):
+        """Migrate database schema to add missing columns"""
+        # Check if watchlist.last_seen exists
+        cursor.execute("PRAGMA table_info(watchlist)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if 'last_seen' not in columns:
+            print("📊 Migrating database: Adding 'last_seen' column to watchlist...")
+            cursor.execute("ALTER TABLE watchlist ADD COLUMN last_seen DATE")
+            print("   ✅ Migration complete")
 
     # ========== SCAN RESULTS ==========
 

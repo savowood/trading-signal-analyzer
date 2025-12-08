@@ -252,14 +252,9 @@ class MomentumScanner(CompositeScanner):
                 hist = ticker.history(period='1mo')
 
                 if hist.empty or len(hist) < 20:
-                    # Skip if insufficient data, but keep FinViz Elite results
-                    if not using_finviz:
-                        filtered_out += 1
-                        continue
-                    else:
-                        # Keep FinViz result with original data
-                        enriched.append(result)
-                        continue
+                    # Skip if insufficient data - we need accurate data to show
+                    filtered_out += 1
+                    continue
 
                 # Get accurate relative volume
                 current_volume = hist['Volume'].iloc[-1]
@@ -298,11 +293,8 @@ class MomentumScanner(CompositeScanner):
                 error_msg = str(e)
                 if "Rate limit" in error_msg or "Too Many Requests" in error_msg:
                     rate_limited += 1
-                # Keep FinViz results even if enrichment fails
-                if using_finviz:
-                    enriched.append(result)
-                else:
-                    filtered_out += 1
+                # Skip if enrichment fails - we need accurate data
+                filtered_out += 1
                 continue
 
         # Clear progress line and show summary
