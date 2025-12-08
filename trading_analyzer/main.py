@@ -314,30 +314,32 @@ def run_darkflow_scan():
             print("💡 Volume clusters show where institutions are accumulating/distributing")
             print("🌊 Look for tight consolidation + volume clusters = potential breakout\n")
 
-            # Offer export options
-            offer_export_options(results, scanner_type='darkflow')
+            # Export options removed for cleaner workflow
+            # User can manually export if needed via menu option
 
-            # Clear separator
-            print("\n" + "=" * 80)
-
-            # Show detailed Dark Flow analysis for top results
-            show_detailed = input("Show detailed Dark Flow analysis for top stocks? (yes/no): ").strip().lower()
-
-            if show_detailed == 'yes':
-                top_results = results[:5]  # Top 5
-                for i, result in enumerate(top_results, 1):
-                    if hasattr(result, 'dark_flow_analysis'):
-                        display_dark_flow_analysis(result.dark_flow_analysis)
-                        if i < len(top_results):
-                            input("\nPress Enter to continue to next stock...")
-
-            # Prompt for technical analysis
+            # Clear separator before ticker selection
             print("\n" + "=" * 80)
             print("📊 TICKER SELECTION FOR DETAILED ANALYSIS")
             print("=" * 80)
+
+            # Prompt for ticker selection
             selected = prompt_ticker_selection(results)
+
             if selected:
                 print(f"\n✅ Selected: {', '.join(selected)}")
+
+                # Show detailed Dark Flow analysis for selected tickers only
+                print("\n" + "=" * 80)
+                print("🌊 DETAILED DARK FLOW ANALYSIS")
+                print("=" * 80)
+
+                for i, ticker in enumerate(selected, 1):
+                    # Find the result for this ticker
+                    result = next((r for r in results if r.ticker == ticker), None)
+                    if result and hasattr(result, 'dark_flow_analysis'):
+                        display_dark_flow_analysis(result.dark_flow_analysis)
+                        if i < len(selected):
+                            input("\nPress Enter to continue to next stock...")
 
                 # Offer chart display
                 offer_chart_display(selected)
