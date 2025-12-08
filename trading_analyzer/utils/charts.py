@@ -206,8 +206,15 @@ class ASCIIChartGenerator:
             indicators.append(f"POC: ${vp_data['poc_price']:.2f} ", style="cyan")
 
         # === ASSEMBLE PANEL ===
+        # Combine all Text objects properly to preserve colors
+        combined_chart = Text()
+        for i, line in enumerate(chart_lines):
+            if i > 0:
+                combined_chart.append("\n")
+            combined_chart.append(line)
+
         panel = Panel(
-            Text.from_ansi("\n".join(str(line) for line in chart_lines)),
+            combined_chart,
             title=indicators,
             border_style="blue",
             box=box.ROUNDED
