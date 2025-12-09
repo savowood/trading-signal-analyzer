@@ -41,60 +41,99 @@ class SmartPreFilter:
             'rejection_reasons': {}
         }
 
-    def quick_check(self, ticker: str) -> tuple[bool, Optional[str]]:
+    def quick_check(self, ticker: str, retry_count: int = 2) -> tuple[bool, Optional[str]]:
         """
-        Quick check if ticker passes basic criteria
+        Quick check if ticker passes basic criteria with retry logic
 
         Args:
             ticker: Stock symbol
+            retry_count: Number of retries for rate limit errors
 
         Returns:
             (passes: bool, rejection_reason: Optional[str])
         """
+        import time
         self.stats['total'] += 1
 
-        try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
+        for attempt in range(retry_count + 1):
+            try:
+                # Add delay to avoid rate limiting (100ms between requests)
+                if attempt > 0:
+                    # Exponential backoff on retries
+                    wait_time = 0.5 * (2 ** attempt)
+                    time.sleep(wait_time)
+                else:
+                    # Small delay between initial requests
+                    time.sleep(0.1)
 
-            # Get basic metrics (no historical data needed)
-            current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
-            volume = info.get('volume') or info.get('regularMarketVolume', 0)
-            float_shares = info.get('floatShares', 0)
-            market_cap = info.get('marketCap', 0)
+                stock = yf.Ticker(ticker)
+                info = stock.info
 
-            # Quick rejection checks
-            if current_price < self.criteria.min_price:
-                self._record_rejection('price_too_low')
-                return False, f"Price ${current_price:.2f} < ${self.criteria.min_price}"
+                # Check if we got valid data (not empty or error response)
+                if not info or len(info) < 3:
+                    if attempt < retry_count:
+                        continue  # Retry
+                    self.stats['errors'] += 1
+                    return False, "No data available"
 
-            if current_price > self.criteria.max_price:
-                self._record_rejection('price_too_high')
-                return False, f"Price ${current_price:.2f} > ${self.criteria.max_price}"
+                # Get basic metrics (no historical data needed)
+                current_price = info.get('currentPrice') or info.get('regularMarketPrice', 0)
+                volume = info.get('volume') or info.get('regularMarketVolume', 0)
+                float_shares = info.get('floatShares', 0)
+                market_cap = info.get('marketCap', 0)
 
-            if volume < self.criteria.min_volume:
-                self._record_rejection('volume_too_low')
-                return False, f"Volume {volume:,} < {self.criteria.min_volume:,}"
+                # Quick rejection checks
+                if current_price < self.criteria.min_price:
+                    self._record_rejection('price_too_low')
+                    return False, f"Price ${current_price:.2f} < ${self.criteria.min_price}"
 
-            if self.criteria.max_float and float_shares > self.criteria.max_float:
-                self._record_rejection('float_too_high')
-                return False, f"Float {float_shares/1e6:.1f}M > {self.criteria.max_float/1e6:.1f}M"
+                if current_price > self.criteria.max_price:
+                    self._record_rejection('price_too_high')
+                    return False, f"Price ${current_price:.2f} > ${self.criteria.max_price}"
 
-            if self.criteria.min_market_cap and market_cap < self.criteria.min_market_cap:
-                self._record_rejection('market_cap_too_low')
-                return False, f"Market cap ${market_cap/1e6:.0f}M too low"
+                if volume < self.criteria.min_volume:
+                    self._record_rejection('volume_too_low')
+                    return False, f"Volume {volume:,} < {self.criteria.min_volume:,}"
 
-            if self.criteria.max_market_cap and market_cap > self.criteria.max_market_cap:
-                self._record_rejection('market_cap_too_high')
-                return False, f"Market cap ${market_cap/1e6:.0f}M too high"
+                if self.criteria.max_float and float_shares > self.criteria.max_float:
+                    self._record_rejection('float_too_high')
+                    return False, f"Float {float_shares/1e6:.1f}M > {self.criteria.max_float/1e6:.1f}M"
 
-            # Passed all checks
-            self.stats['passed'] += 1
-            return True, None
+                if self.criteria.min_market_cap and market_cap < self.criteria.min_market_cap:
+                    self._record_rejection('market_cap_too_low')
+                    return False, f"Market cap ${market_cap/1e6:.0f}M too low"
 
-        except Exception as e:
-            self.stats['errors'] += 1
-            return False, f"Error: {str(e)[:50]}"
+                if self.criteria.max_market_cap and market_cap > self.criteria.max_market_cap:
+                    self._record_rejection('market_cap_too_high')
+                    return False, f"Market cap ${market_cap/1e6:.0f}M too high"
+
+                # Passed all checks
+                self.stats['passed'] += 1
+                return True, None
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check for rate limiting or auth errors
+                if "Too Many Requests" in error_msg or "429" in error_msg:
+                    if attempt < retry_count:
+                        continue  # Retry with backoff
+                    self.stats['errors'] += 1
+                    return False, "Rate limited"
+
+                elif "Unauthorized" in error_msg or "401" in error_msg or "Invalid Crumb" in error_msg:
+                    if attempt < retry_count:
+                        continue  # Retry
+                    self.stats['errors'] += 1
+                    return False, "Auth error"
+
+                # Other errors
+                self.stats['errors'] += 1
+                return False, f"Error: {error_msg[:50]}"
+
+        # If we exhausted all retries
+        self.stats['errors'] += 1
+        return False, "Max retries exceeded"
 
     def filter_tickers(self, tickers: List[str], verbose: bool = False) -> List[str]:
         """
@@ -108,22 +147,43 @@ class SmartPreFilter:
             List of tickers that passed pre-filter
         """
         passed_tickers = []
+        rate_limited_count = 0
+        auth_error_count = 0
 
         print(f"\n🔍 Pre-filtering {len(tickers)} candidates...")
+        print("   (This may take a moment to avoid rate limiting...)")
 
         for i, ticker in enumerate(tickers, 1):
             passes, reason = self.quick_check(ticker)
 
             if passes:
                 passed_tickers.append(ticker)
-            elif verbose and reason:
-                print(f"   ❌ {ticker}: {reason}")
+            elif reason:
+                # Count specific error types
+                if reason == "Rate limited":
+                    rate_limited_count += 1
+                    if verbose and rate_limited_count <= 3:
+                        print(f"   ⏭️  Skipped {ticker}: Rate limited")
+                elif reason == "Auth error":
+                    auth_error_count += 1
+                    if verbose and auth_error_count == 1:
+                        print(f"   ⚠️  Authentication issues detected (will retry automatically)")
+                elif verbose and reason not in ["Rate limited", "Auth error"]:
+                    print(f"   ⏭️  Skipped {ticker}: {reason}")
 
-            # Progress indicator
-            if i % 25 == 0:
-                print(f"   [{i}/{len(tickers)}] Filtered...", end='\r')
+            # Progress indicator every 10 tickers
+            if i % 10 == 0:
+                print(f"   Progress: {i}/{len(tickers)} checked ({len(passed_tickers)} passed)...", end='\r')
 
+        # Clear progress line
+        print(" " * 80, end='\r')
+
+        # Show summary
         print(f"\n   ✅ {len(passed_tickers)}/{len(tickers)} tickers passed pre-filter")
+        if rate_limited_count > 0:
+            print(f"   ⚠️  {rate_limited_count} tickers skipped due to rate limiting")
+        if auth_error_count > 0:
+            print(f"   ⚠️  {auth_error_count} authentication errors (temporary)")
 
         return passed_tickers
 

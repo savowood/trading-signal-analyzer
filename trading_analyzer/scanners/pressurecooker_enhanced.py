@@ -595,7 +595,11 @@ class EnhancedPressureCookerScanner(Scanner):
         """
         Comprehensive squeeze analysis with all Phase 1 and Phase 2 features
         """
+        import time
         try:
+            # Small delay to avoid overwhelming the API
+            time.sleep(0.15)
+
             stock = yf.Ticker(ticker)
             hist = stock.history(period=period, prepost=True)
 
@@ -806,14 +810,15 @@ class EnhancedPressureCookerScanner(Scanner):
             return []
 
         print(f"✅ {len(filtered_candidates)} candidates passed pre-filtering")
-        print(f"\n📊 Deep analysis using parallel processing...")
-        print(f"   (Using {len(filtered_candidates)} workers for faster analysis)")
+        print(f"\n📊 Deep analysis with rate-limit protection...")
+        print(f"   (Processing {len(filtered_candidates)} tickers with 2 concurrent workers)")
 
-        # Parallel analysis
+        # Parallel analysis with reduced concurrency to avoid rate limiting
+        # Using only 2 workers instead of 5 to be more respectful of Yahoo Finance API
         results = parallel_analyze(
             filtered_candidates,
             lambda ticker: self.analyze_ticker(ticker, period="3mo"),
-            max_workers=min(5, len(filtered_candidates))
+            max_workers=2  # Reduced from 5 to avoid rate limiting
         )
 
         # Filter by score and remove None values
