@@ -245,9 +245,9 @@ class ResultExporter:
         elements.append(Spacer(1, 0.3*inch))
 
         # Results table
-        # Select key columns for PDF
-        columns = ['ticker', 'score', 'price', 'change_pct', 'rel_vol', 'float_m', 'setup_stage']
-        headers = ['Ticker', 'Score', 'Price', 'Change%', 'RelVol', 'Float(M)', 'Stage']
+        # Select key columns for PDF (use catalyst instead of setup_stage for momentum scans)
+        columns = ['ticker', 'score', 'price', 'change_pct', 'rel_vol', 'float_m', 'catalyst', 'source']
+        headers = ['Ticker', 'Score', 'Price', 'Change%', 'RelVol', 'Float(M)', 'Catalyst', 'Source']
 
         table_data = [headers]
 
@@ -262,9 +262,10 @@ class ResultExporter:
                 elif col in ['change_pct', 'rel_vol', 'float_m']:
                     row.append(f"{value:.1f}" if isinstance(value, (int, float)) else str(value))
                 elif col == 'score':
-                    row.append(f"{value}/100" if isinstance(value, (int, float)) else str(value))
+                    # Just show the score number, not "/100" since it's already out of 100
+                    row.append(f"{value}" if isinstance(value, (int, float)) else str(value))
                 else:
-                    row.append(str(value)[:20])  # Truncate long strings
+                    row.append(str(value)[:15])  # Truncate long strings
 
             table_data.append(row)
 
