@@ -161,27 +161,37 @@ def handle_scan_results(results, scan_type='momentum', skip_initial_display=Fals
     }
 
     # Workflow loop - allow user to return to scan results
+    first_iteration = True
     while True:
-        # Export option
-        print("\n" + "=" * 80)
-        print("📤 EXPORT OPTIONS")
-        print("=" * 80)
-        print("1. Export results to CSV/JSON")
-        print("2. Continue to ticker selection")
+        # On subsequent iterations, redisplay the results list
+        if not first_iteration:
+            print("\n" + "=" * 80)
+            print("📊 SCAN RESULTS")
+            print("=" * 80)
+            display_results(results)
+            display_summary(results)
 
-        export_choice = input("\nEnter choice (1-2): ").strip()
+        # Export option (only on first iteration)
+        if first_iteration:
+            print("\n" + "=" * 80)
+            print("📤 EXPORT OPTIONS")
+            print("=" * 80)
+            print("1. Export results to CSV/JSON")
+            print("2. Continue to ticker selection")
 
-        if export_choice == '1':
-            try:
-                exporter = ResultExporter()
-                csv_path, json_path = exporter.export_results(results, scan_type)
-                print(f"\n✅ Exported to:")
-                print(f"   CSV:  {csv_path}")
-                print(f"   JSON: {json_path}")
-            except Exception as e:
-                print(f"❌ Export error: {e}")
+            export_choice = input("\nEnter choice (1-2): ").strip()
 
-            input("\nPress Enter to continue...")
+            if export_choice == '1':
+                try:
+                    exporter = ResultExporter()
+                    csv_path, json_path = exporter.export_results(results, scan_type)
+                    print(f"\n✅ Exported to:")
+                    print(f"   CSV:  {csv_path}")
+                    print(f"   JSON: {json_path}")
+                except Exception as e:
+                    print(f"❌ Export error: {e}")
+
+                input("\nPress Enter to continue...")
 
         # Clear separator before ticker selection
         print("\n" + "=" * 80)
@@ -190,6 +200,7 @@ def handle_scan_results(results, scan_type='momentum', skip_initial_display=Fals
 
         # Prompt for ticker selection for technical analysis
         selected = prompt_ticker_selection(results)
+        first_iteration = False  # Mark that we've been through once
         if not selected:
             # User chose to skip or back - exit workflow
             break
