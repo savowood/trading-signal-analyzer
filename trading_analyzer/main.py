@@ -987,21 +987,12 @@ def analyze_single_ticker():
                 'nearest_support': support,
                 'nearest_resistance': resistance
             }
-            # Create SMA levels dict for chart
-            sma_dict = {}
-            if sma_20:
-                sma_dict['sma_20'] = sma_20
-            if sma_50:
-                sma_dict['sma_50'] = sma_50
-            if sma_200:
-                sma_dict['sma_200'] = sma_200
 
             chart_gen.plot_price_chart(
                 hist,
                 ticker,
                 sr_levels=sr_levels,
-                rr_ratio=rr_ratio,
-                sma_levels=sma_dict if sma_dict else None
+                rr_ratio=rr_ratio
             )
             input("\nPress Enter to continue...")
 
@@ -1292,25 +1283,11 @@ def offer_chart_display(tickers: List[str]):
                     except:
                         pass  # If S/R calculation fails, chart will work without it
 
-                    # Calculate SMA levels (key support/resistance)
-                    sma_levels = None
-                    try:
-                        sma_levels = {}
-                        if len(hist) >= 20:
-                            sma_levels['sma_20'] = float(hist['Close'].rolling(window=20).mean().iloc[-1])
-                        if len(hist) >= 50:
-                            sma_levels['sma_50'] = float(hist['Close'].rolling(window=50).mean().iloc[-1])
-                        if len(hist) >= 200:
-                            sma_levels['sma_200'] = float(hist['Close'].rolling(window=200).mean().iloc[-1])
-                    except:
-                        pass  # If SMA calculation fails, chart will work without it
-
                     chart_gen.plot_price_chart(
                         hist,
                         ticker,
                         sr_levels=sr_levels,
-                        rr_ratio=rr_ratio,
-                        sma_levels=sma_levels
+                        rr_ratio=rr_ratio
                     )
                 else:
                     print(f"❌ No data available for {ticker}")

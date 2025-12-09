@@ -50,10 +50,9 @@ class ASCIIChartGenerator:
                         sr_levels: Optional[dict] = None,
                         vp_data: Optional[dict] = None,
                         entry_price: Optional[float] = None,
-                        rr_ratio: float = 2.0,
-                        sma_levels: Optional[dict] = None):
+                        rr_ratio: float = 2.0):
         """
-        Plot price chart with volume, S/R levels, volume profile, SMAs, and R:R targets
+        Plot price chart with volume, S/R levels, volume profile, and R:R targets
 
         Args:
             hist: Historical OHLCV data
@@ -62,7 +61,6 @@ class ASCIIChartGenerator:
             vp_data: Volume profile data dict
             entry_price: Entry price for R:R calculation (defaults to current price)
             rr_ratio: Risk/Reward ratio (e.g., 2.0 for 1:2)
-            sma_levels: SMA levels dict (sma_20, sma_50, sma_200)
         """
         if not RICH_AVAILABLE:
             print("⚠️  Install 'rich' library: pip install rich")
@@ -176,21 +174,6 @@ class ASCIIChartGenerator:
                         char = "─"
                         style = "red bold"
 
-                # Mark SMA levels (key support/resistance)
-                if sma_levels:
-                    if sma_levels.get('sma_20'):
-                        if abs(price_level - sma_levels['sma_20']) < tolerance:
-                            char = "∙"
-                            style = "yellow bold"
-                    if sma_levels.get('sma_50'):
-                        if abs(price_level - sma_levels['sma_50']) < tolerance:
-                            char = "∙"
-                            style = "magenta bold"
-                    if sma_levels.get('sma_200'):
-                        if abs(price_level - sma_levels['sma_200']) < tolerance:
-                            char = "∙"
-                            style = "blue bold"
-
                 line.append(char, style=style)
 
             chart_lines.append(line)
@@ -262,16 +245,6 @@ class ASCIIChartGenerator:
             indicators.append(f"Target: ${rr_levels['target']:.2f} ", style="green bold")
             indicators.append(f"Stop: ${rr_levels['stop']:.2f} ", style="red bold")
             indicators.append(f"(1:{rr_ratio:.1f} R:R)", style="dim")
-
-        # Show SMA levels (key support/resistance)
-        if sma_levels:
-            indicators.append("\n")
-            if sma_levels.get('sma_20'):
-                indicators.append(f"SMA(20): ${sma_levels['sma_20']:.2f} ", style="yellow bold")
-            if sma_levels.get('sma_50'):
-                indicators.append(f"SMA(50): ${sma_levels['sma_50']:.2f} ", style="magenta bold")
-            if sma_levels.get('sma_200'):
-                indicators.append(f"SMA(200): ${sma_levels['sma_200']:.2f}", style="blue bold")
 
         # === ASSEMBLE PANEL ===
         # Combine all Text objects properly to preserve colors
