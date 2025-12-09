@@ -176,20 +176,43 @@ def handle_scan_results(results, scan_type='momentum', skip_initial_display=Fals
             print("\n" + "=" * 80)
             print("📤 EXPORT OPTIONS")
             print("=" * 80)
-            print("1. Export results to CSV/JSON")
-            print("2. Continue to ticker selection")
+            print("1. Export to CSV")
+            print("2. Export to JSON")
+            print("3. Export to Excel (XLSX)")
+            print("4. Export to PDF")
+            print("5. Export to ALL formats")
+            print("6. Skip export / Continue to ticker selection")
 
-            export_choice = input("\nEnter choice (1-2): ").strip()
+            export_choice = input("\nEnter choice (1-6): ").strip()
 
-            if export_choice == '1':
+            if export_choice in ['1', '2', '3', '4', '5']:
                 try:
                     exporter = ResultExporter()
-                    csv_path, json_path = exporter.export_results(results, scan_type)
-                    print(f"\n✅ Exported to:")
-                    print(f"   CSV:  {csv_path}")
-                    print(f"   JSON: {json_path}")
+
+                    # Convert ScanResult objects to dictionaries for export
+                    results_dicts = []
+                    for r in results:
+                        if hasattr(r, '__dict__'):
+                            results_dicts.append(r.__dict__)
+                        else:
+                            results_dicts.append(r)
+
+                    # Export based on choice
+                    if export_choice == '1':
+                        exporter.export_to_csv(results_dicts, scanner_type=scan_type)
+                    elif export_choice == '2':
+                        exporter.export_to_json(results_dicts, scanner_type=scan_type)
+                    elif export_choice == '3':
+                        exporter.export_to_excel(results_dicts, scanner_type=scan_type)
+                    elif export_choice == '4':
+                        exporter.export_to_pdf(results_dicts, scanner_type=scan_type)
+                    elif export_choice == '5':
+                        exporter.export_all_formats(results_dicts, scanner_type=scan_type)
+
                 except Exception as e:
                     print(f"❌ Export error: {e}")
+                    import traceback
+                    traceback.print_exc()
 
                 input("\nPress Enter to continue...")
 

@@ -296,6 +296,41 @@ class ResultExporter:
         print(f"✅ Exported to PDF: {filepath}")
         return str(filepath)
 
+    def export_to_json(self,
+                      results: List[dict],
+                      filename: Optional[str] = None,
+                      scanner_type: str = 'scan') -> str:
+        """
+        Export results to JSON
+
+        Args:
+            results: List of result dictionaries
+            filename: Output filename (auto-generated if None)
+            scanner_type: Type of scan (for filename)
+
+        Returns:
+            Path to exported file
+        """
+        import json
+
+        if not results:
+            print("⚠️  No results to export")
+            return None
+
+        # Generate filename if not provided
+        if not filename:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{scanner_type}_results_{timestamp}.json"
+
+        filepath = self.output_dir / filename
+
+        # Export to JSON with pretty printing
+        with open(filepath, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+
+        print(f"✅ Exported to JSON: {filepath}")
+        return str(filepath)
+
     def export_all_formats(self,
                           results: List[dict],
                           base_filename: Optional[str] = None,
@@ -322,7 +357,8 @@ class ResultExporter:
 
         # Export to each format
         exports['csv'] = self.export_to_csv(results, f"{base_filename}.csv", scanner_type)
-        exports['excel'] = self.export_to_excel(results, f"{base_filename}.xlsx", scanner_type)
+        exports['json'] = self.export_to_json(results, f"{base_filename}.json", scanner_type)
+        exports['xlsx'] = self.export_to_excel(results, f"{base_filename}.xlsx", scanner_type)
         exports['pdf'] = self.export_to_pdf(results, f"{base_filename}.pdf", scanner_type)
 
         print(f"\n✅ Exported to all formats:")
