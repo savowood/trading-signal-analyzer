@@ -841,13 +841,17 @@ def analyze_single_ticker():
         style_config = TRADING_STYLES[DEFAULT_TRADING_STYLE]
         rr_ratio = DEFAULT_RR_RATIO
 
-        # Fetch data with pre-market and after-hours
+        # Fetch data with pre-market and after-hours for chart display
         info = stock.info
         hist = stock.history(period=style_config['chart_period'], interval=style_config['chart_interval'], prepost=True)
 
         if hist.empty:
             print(f"❌ No data available for {ticker}")
             return
+
+        # Fetch longer-term daily data for technical indicators (SMAs need more data points)
+        # For intraday traders, we still need daily data to calculate meaningful SMAs
+        hist_daily = stock.history(period='1y', interval='1d', prepost=True)
 
         # Current price and basic info
         current_price = hist['Close'].iloc[-1]
@@ -985,10 +989,11 @@ def analyze_single_ticker():
             pass
 
         # Moving Averages (key support/resistance levels)
+        # Calculate from daily data for meaningful SMAs even for intraday traders
         try:
-            sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1] if len(hist) >= 20 else None
-            sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1] if len(hist) >= 50 else None
-            sma_200 = hist['Close'].rolling(window=200).mean().iloc[-1] if len(hist) >= 200 else None
+            sma_20 = hist_daily['Close'].rolling(window=20).mean().iloc[-1] if len(hist_daily) >= 20 else None
+            sma_50 = hist_daily['Close'].rolling(window=50).mean().iloc[-1] if len(hist_daily) >= 50 else None
+            sma_200 = hist_daily['Close'].rolling(window=200).mean().iloc[-1] if len(hist_daily) >= 200 else None
 
             if sma_20:
                 print(f"   SMA(20):        ${sma_20:.2f} - {'ABOVE ✅' if current_price > sma_20 else 'BELOW ⚠️'}")
@@ -1003,7 +1008,8 @@ def analyze_single_ticker():
                     print(f"   Trend:          GOLDEN CROSS 🌟 (SMA 20 > SMA 200) - Bullish")
                 else:
                     print(f"   Trend:          DEATH CROSS ⚰️  (SMA 20 < SMA 200) - Bearish")
-        except:
+        except Exception as e:
+            print(f"   ⚠️  Could not calculate SMAs: {str(e)}")
             pass
 
         print("\n" + "=" * 100)
