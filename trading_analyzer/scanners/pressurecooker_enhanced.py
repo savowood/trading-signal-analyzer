@@ -597,7 +597,7 @@ class EnhancedPressureCookerScanner(Scanner):
         """
         try:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period=period)
+            hist = stock.history(period=period, prepost=True)
 
             if hist.empty or len(hist) < 20:
                 return None

@@ -565,8 +565,8 @@ class ForexProvider(Scanner):
         try:
             ticker = yf.Ticker(pair)
 
-            # Get 5-day data
-            hist = ticker.history(period='5d', interval='1h')
+            # Get 5-day data (including pre-market and after-hours)
+            hist = ticker.history(period='5d', interval='1h', prepost=True)
             if hist.empty or len(hist) < 2:
                 return None
 
@@ -722,8 +722,8 @@ class CryptoProvider(Scanner):
         try:
             ticker = yf.Ticker(crypto)
 
-            # Get 5-day data
-            hist = ticker.history(period='5d', interval='1h')
+            # Get 5-day data (including pre-market and after-hours)
+            hist = ticker.history(period='5d', interval='1h', prepost=True)
             if hist.empty or len(hist) < 2:
                 return None
 

@@ -705,9 +705,9 @@ def analyze_single_ticker():
         style_config = TRADING_STYLES[DEFAULT_TRADING_STYLE]
         rr_ratio = DEFAULT_RR_RATIO
 
-        # Fetch data
+        # Fetch data with pre-market and after-hours
         info = stock.info
-        hist = stock.history(period=style_config['chart_period'], interval=style_config['chart_interval'])
+        hist = stock.history(period=style_config['chart_period'], interval=style_config['chart_interval'], prepost=True)
 
         if hist.empty:
             print(f"❌ No data available for {ticker}")
@@ -718,6 +718,22 @@ def analyze_single_ticker():
         prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
         change = current_price - prev_close
         change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+
+        # Check if current price is from extended hours
+        import datetime
+        last_timestamp = hist.index[-1]
+        is_extended_hours = False
+        extended_label = ""
+
+        if hasattr(last_timestamp, 'hour'):
+            hour = last_timestamp.hour
+            # Market hours are 9:30 AM - 4:00 PM EST (14:30 - 21:00 UTC typically)
+            if hour < 14 or hour >= 21:
+                is_extended_hours = True
+                if hour < 14:
+                    extended_label = " [PRE-MARKET]"
+                else:
+                    extended_label = " [AFTER-HOURS]"
 
         # Volume analysis
         current_volume = hist['Volume'].iloc[-1]
@@ -747,7 +763,15 @@ def analyze_single_ticker():
 
         # Price Section
         print(f"\n💰 PRICE INFORMATION")
-        print(f"   Current:        ${current_price:.2f}")
+        print(f"   Current:        ${current_price:.2f}{extended_label}")
+        if is_extended_hours:
+            # Try to get regular hours close
+            regular_close = info.get('regularMarketPreviousClose', info.get('previousClose'))
+            if regular_close:
+                ext_change = current_price - regular_close
+                ext_change_pct = (ext_change / regular_close * 100) if regular_close > 0 else 0
+                print(f"   Regular Close:  ${regular_close:.2f}")
+                print(f"   Extended Move:  ${ext_change:+.2f} ({ext_change_pct:+.2f}%)")
         print(f"   Change:         ${change:+.2f} ({change_pct:+.2f}%)")
         print(f"   Day Range:      ${day_low:.2f} - ${day_high:.2f}")
         print(f"   Week Range:     ${week_low:.2f} - ${week_high:.2f}")
@@ -1128,7 +1152,7 @@ def offer_chart_display(tickers: List[str]):
 
             try:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(period=chart_period, interval=style_config['chart_interval'])
+                hist = stock.history(period=chart_period, interval=style_config['chart_interval'], prepost=True)
 
                 if not hist.empty:
                     # Calculate basic S/R levels from price data

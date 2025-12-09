@@ -65,7 +65,7 @@ class TechnicalAnalyzer:
         """Fetch stock data"""
         try:
             stock = yf.Ticker(self.ticker)
-            self.data = stock.history(period=self.period)
+            self.data = stock.history(period=self.period, prepost=True)
 
             if self.data.empty:
                 return False

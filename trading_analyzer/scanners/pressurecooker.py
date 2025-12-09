@@ -93,8 +93,8 @@ class PressureCookerScanner(Scanner):
         try:
             stock = yf.Ticker(ticker)
 
-            # Get historical data
-            hist = stock.history(period=period)
+            # Get historical data (including pre-market and after-hours)
+            hist = stock.history(period=period, prepost=True)
             if hist.empty or len(hist) < 20:
                 return None
 

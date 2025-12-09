@@ -83,7 +83,7 @@ class HybridDataProvider:
 
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period)
+            df = stock.history(period=period, prepost=True)
 
             if not df.empty:
                 df.attrs['source'] = 'yfinance'

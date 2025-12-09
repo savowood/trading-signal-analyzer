@@ -337,7 +337,7 @@ if __name__ == "__main__":
     for ticker in test_tickers:
         try:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period='3mo')
+            hist = stock.history(period='3mo', prepost=True)
             info = stock.info
 
             result = validator.validate_stock_data(ticker, hist, info)

@@ -246,10 +246,10 @@ class MomentumScanner(CompositeScanner):
                 if i > 1:
                     time.sleep(0.05)
 
-                # Fetch real data from yfinance
+                # Fetch real data from yfinance (including pre-market and after-hours)
                 ticker = yf.Ticker(result.ticker)
                 info = ticker.info
-                hist = ticker.history(period='1mo')
+                hist = ticker.history(period='1mo', prepost=True)
 
                 if hist.empty or len(hist) < 20:
                     # Skip if insufficient data - we need accurate data to show

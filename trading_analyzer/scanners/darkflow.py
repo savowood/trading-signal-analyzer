@@ -196,7 +196,7 @@ class DarkFlowScanner(Scanner):
         """Analyze volume profile to detect institutional activity levels"""
         try:
             stock = yf.Ticker(ticker)
-            df = stock.history(period=period, interval="1h")
+            df = stock.history(period=period, interval="1h", prepost=True)
 
             if df.empty or len(df) < 10:
                 return None

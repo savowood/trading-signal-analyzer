@@ -307,7 +307,7 @@ if __name__ == "__main__":
 
     ticker = 'GME'
     stock = yf.Ticker(ticker)
-    hist = stock.history(period='3mo')
+    hist = stock.history(period='3mo', prepost=True)
 
     analyzer = TechnicalAnalyzer()
 
