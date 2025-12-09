@@ -302,8 +302,8 @@ TRADING_STYLES = {
         'description': 'Quick in-and-out trades',
         'typical_duration': 'Minutes to hours',
         'hold_time': '1m - 4h',
-        'chart_period': '5d',           # 5 days of data
-        'chart_interval': '5m',         # 5-minute candles
+        'chart_period': '1d',           # 1 day (current session)
+        'chart_interval': '1m',         # 1-minute candles
         'default_rr': 2.0,              # 1:2 risk/reward
         'indicators': ['VWAP', 'Level 2', 'Tape Reading']
     },
@@ -312,8 +312,8 @@ TRADING_STYLES = {
         'description': 'Same-day trades, close before market close',
         'typical_duration': 'Hours (same day)',
         'hold_time': '30m - 6h',
-        'chart_period': '1mo',          # 1 month of data
-        'chart_interval': '15m',        # 15-minute candles
+        'chart_period': '1d',           # 1 day (24 hours)
+        'chart_interval': '5m',         # 5-minute candles
         'default_rr': 2.0,              # 1:2 risk/reward
         'indicators': ['VWAP', 'MACD', 'RSI', 'Volume']
     },
