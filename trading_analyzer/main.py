@@ -32,6 +32,13 @@ from .utils import (
     ASCIIChartGenerator
 )
 
+# Global storage for previous scan results
+PREVIOUS_SCANS = {
+    'momentum': None,
+    'darkflow': None,
+    'pressurecooker': None
+}
+
 
 def main():
     """Main application loop"""
@@ -88,26 +95,30 @@ def main():
             run_pressure_cooker_scan()
 
         elif choice == '4':
+            # View previous scan results
+            view_previous_scan_results()
+
+        elif choice == '5':
             # Analyze single ticker
             analyze_single_ticker()
 
-        elif choice == '5':
+        elif choice == '6':
             # View database statistics
             view_database_statistics()
 
-        elif choice == '6':
+        elif choice == '7':
             # Manage watchlist
             manage_watchlist()
 
-        elif choice == '7':
+        elif choice == '8':
             # View cache status
             view_cache_status(cache)
 
-        elif choice == '8':
+        elif choice == '9':
             # Clear cache
             clear_cache(cache)
 
-        elif choice == '9':
+        elif choice == 's':
             # View settings
             view_settings()
 
@@ -125,6 +136,114 @@ def main():
         input("\nPress Enter to continue...")
 
 
+def handle_scan_results(results, scan_type='momentum', skip_initial_display=False):
+    """
+    Handle scan results workflow: display, export, ticker selection, analysis
+
+    Args:
+        results: Scan results list
+        scan_type: Type of scan ('momentum', 'darkflow', 'pressurecooker')
+        skip_initial_display: If True, skip displaying results (already displayed)
+    """
+    # Display results (unless already displayed)
+    if not skip_initial_display:
+        display_results(results)
+        display_summary(results)
+
+    if not results:
+        return
+
+    # Store results for later access
+    PREVIOUS_SCANS[scan_type] = {
+        'results': results,
+        'timestamp': datetime.now(),
+        'type': scan_type
+    }
+
+    # Workflow loop - allow user to return to scan results
+    while True:
+        # Export option
+        print("\n" + "=" * 80)
+        print("📤 EXPORT OPTIONS")
+        print("=" * 80)
+        print("1. Export results to CSV/JSON")
+        print("2. Continue to ticker selection")
+
+        export_choice = input("\nEnter choice (1-2): ").strip()
+
+        if export_choice == '1':
+            try:
+                exporter = ResultExporter()
+                csv_path, json_path = exporter.export_results(results, scan_type)
+                print(f"\n✅ Exported to:")
+                print(f"   CSV:  {csv_path}")
+                print(f"   JSON: {json_path}")
+            except Exception as e:
+                print(f"❌ Export error: {e}")
+
+            input("\nPress Enter to continue...")
+
+        # Clear separator before ticker selection
+        print("\n" + "=" * 80)
+        print("📊 TICKER SELECTION FOR DETAILED ANALYSIS")
+        print("=" * 80)
+
+        # Prompt for ticker selection for technical analysis
+        selected = prompt_ticker_selection(results)
+        if not selected:
+            # User chose to skip or back - exit workflow
+            break
+
+        print(f"\n✅ Selected: {', '.join(selected)}")
+
+        # Show Dark Flow detailed analysis for selected tickers (if applicable)
+        if scan_type == 'darkflow':
+            from .ui.display import display_dark_flow_analysis
+            print("\n" + "=" * 80)
+            print("🌊 DETAILED DARK FLOW ANALYSIS")
+            print("=" * 80)
+
+            for i, ticker in enumerate(selected, 1):
+                # Find the result for this ticker
+                result = next((r for r in results if r.ticker == ticker), None)
+                if result and hasattr(result, 'dark_flow_analysis'):
+                    display_dark_flow_analysis(result.dark_flow_analysis)
+                    if i < len(selected):
+                        input("\nPress Enter to continue to next stock...")
+
+        # Show Pressure Cooker detailed analysis for selected tickers (if applicable)
+        if scan_type == 'pressurecooker':
+            print("\n" + "=" * 80)
+            print("🎯 DETAILED PRESSURE COOKER ANALYSIS")
+            print("=" * 80)
+
+            for i, ticker in enumerate(selected, 1):
+                # Find the result for this ticker
+                result = next((r for r in results if r.ticker == ticker), None)
+                if result:
+                    display_pressure_cooker_details(result)
+                    if i < len(selected):
+                        input("\nPress Enter to continue to next stock...")
+
+        # Offer chart display
+        offer_chart_display(selected)
+
+        # Technical analysis
+        analyze_selected_tickers(selected)
+
+        # After analysis, ask if user wants to select more tickers
+        print("\n" + "=" * 80)
+        print("OPTIONS")
+        print("=" * 80)
+        print("1. Select more tickers from scan results")
+        print("2. Return to main menu")
+
+        next_choice = input("\nEnter choice (1-2): ").strip()
+
+        if next_choice != '1':
+            break
+
+
 def run_scan(scanner):
     """Run momentum scan workflow"""
     # Get scan parameters from user
@@ -138,31 +257,8 @@ def run_scan(scanner):
         # Run scan
         results = scanner.scan(params)
 
-        # Display results
-        display_results(results)
-        display_summary(results)
-
-        if not results:
-            return
-
-        # Export options removed for cleaner workflow
-        # User can manually export if needed via menu option
-
-        # Clear separator before ticker selection
-        print("\n" + "=" * 80)
-        print("📊 TICKER SELECTION FOR DETAILED ANALYSIS")
-        print("=" * 80)
-
-        # Prompt for ticker selection for technical analysis
-        selected = prompt_ticker_selection(results)
-        if selected:
-            print(f"\n✅ Selected: {', '.join(selected)}")
-
-            # Offer chart display
-            offer_chart_display(selected)
-
-            # Technical analysis
-            analyze_selected_tickers(selected)
+        # Handle scan results with export and ticker selection
+        handle_scan_results(results, scan_type='momentum')
 
     except KeyboardInterrupt:
         print("\n\nScan cancelled by user.")
@@ -314,38 +410,9 @@ def run_darkflow_scan():
             print("💡 Volume clusters show where institutions are accumulating/distributing")
             print("🌊 Look for tight consolidation + volume clusters = potential breakout\n")
 
-            # Export options removed for cleaner workflow
-            # User can manually export if needed via menu option
-
-            # Clear separator before ticker selection
-            print("\n" + "=" * 80)
-            print("📊 TICKER SELECTION FOR DETAILED ANALYSIS")
-            print("=" * 80)
-
-            # Prompt for ticker selection
-            selected = prompt_ticker_selection(results)
-
-            if selected:
-                print(f"\n✅ Selected: {', '.join(selected)}")
-
-                # Show detailed Dark Flow analysis for selected tickers only
-                print("\n" + "=" * 80)
-                print("🌊 DETAILED DARK FLOW ANALYSIS")
-                print("=" * 80)
-
-                for i, ticker in enumerate(selected, 1):
-                    # Find the result for this ticker
-                    result = next((r for r in results if r.ticker == ticker), None)
-                    if result and hasattr(result, 'dark_flow_analysis'):
-                        display_dark_flow_analysis(result.dark_flow_analysis)
-                        if i < len(selected):
-                            input("\nPress Enter to continue to next stock...")
-
-                # Offer chart display
-                offer_chart_display(selected)
-
-                # Technical analysis
-                analyze_selected_tickers(selected)
+            # Handle scan results with export and ticker selection
+            # Skip initial display since we already showed Dark Flow-specific display
+            handle_scan_results(results, scan_type='darkflow', skip_initial_display=True)
         else:
             print("\n✅ No significant Dark Flow signals detected")
             print("   This could mean:")
@@ -554,6 +621,61 @@ def create_settings_file():
         print(f"\n❌ Failed to create settings file")
 
 
+def view_previous_scan_results():
+    """View and work with previous scan results"""
+    print("\n" + "=" * 80)
+    print("📋 PREVIOUS SCAN RESULTS")
+    print("=" * 80)
+
+    # Check if any scans are available
+    available_scans = []
+    for scan_type, scan_data in PREVIOUS_SCANS.items():
+        if scan_data:
+            available_scans.append((scan_type, scan_data))
+
+    if not available_scans:
+        print("\n❌ No previous scan results available.")
+        print("   Run a scan first (Momentum, Dark Flow, or Pressure Cooker).")
+        input("\nPress Enter to continue...")
+        return
+
+    # Show available scans
+    print("\nAvailable scans:")
+    for i, (scan_type, scan_data) in enumerate(available_scans, 1):
+        timestamp = scan_data['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+        result_count = len(scan_data['results'])
+        scan_name = {
+            'momentum': '🔥 Momentum Scan (5 Pillars)',
+            'darkflow': '🌊 Dark Flow (Institutional Activity)',
+            'pressurecooker': '🎯 Pressure Cooker (Short Squeeze)'
+        }.get(scan_type, scan_type)
+        print(f"{i}. {scan_name}")
+        print(f"   Time: {timestamp} | Results: {result_count} tickers")
+
+    # Select scan
+    choice = input(f"\nSelect scan to view (1-{len(available_scans)}) or 'q' to go back: ").strip().lower()
+
+    if choice == 'q':
+        return
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(available_scans):
+            scan_type, scan_data = available_scans[idx]
+            results = scan_data['results']
+
+            print(f"\n{'=' * 80}")
+            print(f"Loading {scan_type} scan results...")
+            print(f"{'=' * 80}")
+
+            # Handle the scan results (export, ticker selection, analysis)
+            handle_scan_results(results, scan_type=scan_type)
+        else:
+            print("❌ Invalid selection")
+    except ValueError:
+        print("❌ Invalid input")
+
+
 def run_pressure_cooker_scan():
     """Run Pressure Cooker short squeeze scanner"""
     # Load current settings
@@ -648,29 +770,9 @@ def run_pressure_cooker_scan():
             if not results:
                 return
 
-            # Offer export options
-            offer_export_options(results, scanner_type='pressure_cooker')
-
-            # Clear separator before ticker selection
-            print("\n" + "=" * 80)
-            print("📊 TICKER SELECTION FOR DETAILED ANALYSIS")
-            print("=" * 80)
-
-            # Prompt for detailed analysis
-            selected = prompt_ticker_selection(results)
-            if selected:
-                print(f"\n✅ Selected: {', '.join(selected)}")
-
-                # Offer chart display
-                offer_chart_display(selected)
-
-                # Show detailed analysis for each
-                for ticker in selected:
-                    # Find the result
-                    result = next((r for r in results if r.ticker == ticker), None)
-                    if result:
-                        display_pressure_cooker_details(result)
-                        input("\nPress Enter to continue...")
+            # Handle scan results with export and ticker selection
+            # Skip initial display since we already showed Pressure Cooker-specific display
+            handle_scan_results(results, scan_type='pressurecooker', skip_initial_display=True)
 
         except KeyboardInterrupt:
             print("\n\nScan cancelled by user.")
