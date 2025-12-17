@@ -538,8 +538,18 @@ class EnhancedPressureCookerScanner(Scanner):
 
         # 4. RISK ADJUSTMENT (-15 to +15 points)
         risk_score = 0
+
+        # Reverse split analysis - recent splits are POSITIVE (fresh setup)
         if metrics.get('has_reverse_split'):
-            risk_score -= 5
+            split_days = metrics.get('split_days_ago', 999)
+            if split_days <= 60:
+                # Recent reverse split (0-60 days) = POSITIVE squeeze setup
+                risk_score += 5
+                key_factors.append(f'Recent Reverse Split ({split_days}d ago - Fresh Setup)')
+            else:
+                # Older reverse split = NEGATIVE (dilution concern)
+                risk_score -= 5
+
         if metrics.get('avg_volume_20d', 1000000) < 500000:
             risk_score -= 5
         if not metrics.get('has_news_catalyst'):
@@ -649,7 +659,7 @@ class EnhancedPressureCookerScanner(Scanner):
             high_20d = hist['High'].tail(20).max()
             breaking_high = current_price >= high_20d * 0.98
             consecutive_vol = self._check_consecutive_volume(hist)
-            has_reverse_split = self._detect_reverse_split(hist)
+            has_reverse_split, split_days_ago = self._detect_reverse_split(hist)
             change_pct = ((current_price - hist['Close'].iloc[-2]) / hist['Close'].iloc[-2]) * 100
 
             # PHASE 1: Technical Analysis
@@ -674,6 +684,7 @@ class EnhancedPressureCookerScanner(Scanner):
                 'rel_vol': rel_vol,
                 'avg_volume_20d': avg_volume_20d,
                 'has_reverse_split': has_reverse_split,
+                'split_days_ago': split_days_ago,
                 **technicals,
                 **progression,
                 **options_data,
@@ -761,19 +772,28 @@ class EnhancedPressureCookerScanner(Scanner):
 
         return consecutive_count
 
-    def _detect_reverse_split(self, hist: pd.DataFrame) -> bool:
-        """Detect potential reverse split"""
+    def _detect_reverse_split(self, hist: pd.DataFrame) -> Tuple[bool, int]:
+        """
+        Detect potential reverse split and how recent it is
+
+        Returns:
+            (has_reverse_split, days_ago)
+            days_ago = 999 if no split detected
+        """
         if len(hist) < 40:
-            return False
+            return (False, 999)
 
         price_changes = hist['Close'].pct_change()
         volume_changes = hist['Volume'].pct_change()
 
+        # Look for reverse split in last 30 days
         for i in range(len(hist) - 30, len(hist)):
             if price_changes.iloc[i] > 4.0 and volume_changes.iloc[i] < -0.5:
-                return True
+                # Found a reverse split - calculate days ago
+                days_ago = len(hist) - i - 1
+                return (True, days_ago)
 
-        return False
+        return (False, 999)
 
     # ========== SCANNER INTEGRATION ==========
 
@@ -815,11 +835,12 @@ class EnhancedPressureCookerScanner(Scanner):
 
         # Parallel analysis with reduced concurrency to avoid rate limiting
         # Using only 2 workers instead of 5 to be more respectful of Yahoo Finance API
-        results = parallel_analyze(
-            filtered_candidates,
-            lambda ticker: self.analyze_ticker(ticker, period="3mo"),
-            max_workers=2  # Reduced from 5 to avoid rate limiting
-        )
+        # Note: Using direct method call instead of lambda to avoid pickling issues
+        results = []
+        for ticker in filtered_candidates:
+            result = self.analyze_ticker(ticker, period="3mo")
+            if result is not None:
+                results.append(result)
 
         # Filter by score and remove None values
         results = [r for r in results if r is not None and r.score >= 60]

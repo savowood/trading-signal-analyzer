@@ -14,10 +14,11 @@ from .ui.display import (
     show_disclaimer, show_pressure_cooker_disclaimer,
     display_results, display_summary, display_pressure_cooker_results,
     display_pressure_cooker_details, prompt_ticker_selection,
-    display_technical_analysis
+    display_technical_analysis, display_fibonacci_analysis
 )
 from .core.analysis import analyze_ticker
 from .core.scanner import ScanParameters, ScanMode, ScanResult
+from .predictive.fibonacci import analyze_fibonacci
 from .scanners.momentum import create_scanner
 from .scanners.darkflow import create_darkflow_scanner
 from .scanners.pressurecooker_enhanced import create_enhanced_pressure_cooker_scanner
@@ -25,11 +26,12 @@ from .data.cache import get_cache_manager
 from .data.database import get_database_manager
 from .config import (
     VERSION, load_user_settings, apply_user_settings, save_user_settings,
-    create_default_settings_file, get_settings_info
+    create_default_settings_file, get_settings_info, get_technical_analysis_params
 )
 from .utils import (
     ResultExporter,
-    ASCIIChartGenerator
+    ASCIIChartGenerator,
+    normalize_ticker
 )
 
 # Global storage for previous scan results
@@ -132,8 +134,7 @@ def main():
 
         else:
             print("❌ Invalid choice. Please try again.")
-
-        input("\nPress Enter to continue...")
+            input("\nPress Enter to continue...")
 
 
 def handle_scan_results(results, scan_type='momentum', skip_initial_display=False):
@@ -304,19 +305,95 @@ def run_scan(scanner):
 
 def analyze_selected_tickers(tickers):
     """Analyze selected tickers with technical indicators"""
+    import yfinance as yf
+    from .config import DEFAULT_TRADING_STYLE
+
+    # Get correct technical analysis parameters based on trading style
+    ta_params = get_technical_analysis_params(DEFAULT_TRADING_STYLE)
+
     print(f"\n{'=' * 100}")
     print(f"TECHNICAL ANALYSIS")
     print(f"{'=' * 100}")
     print(f"Analyzing {len(tickers)} ticker(s)...")
+    print(f"Using {ta_params['interval']} timeframe for indicators (based on trading style)")
 
     for i, ticker in enumerate(tickers, 1):
         print(f"\n[{i}/{len(tickers)}] Analyzing {ticker}...")
 
         try:
-            analysis = analyze_ticker(ticker)
+            # Technical analysis with correct timeframe
+            analysis = analyze_ticker(ticker, period=ta_params['period'], interval=ta_params['interval'])
 
             if analysis:
                 display_technical_analysis(analysis)
+
+                # Fibonacci projections (predictive)
+                try:
+                    stock = yf.Ticker(ticker)
+                    hist = stock.history(period="3mo", prepost=True)
+
+                    if not hist.empty and len(hist) >= 20:
+                        # Get real-time price (includes pre/post market)
+                        info = stock.info
+                        real_time_price = info.get('currentPrice') or info.get('regularMarketPrice')
+
+                        fib_analysis = analyze_fibonacci(ticker, hist, real_time_price)
+                        display_fibonacci_analysis(fib_analysis)
+                    else:
+                        print("\n⚠️  Insufficient data for Fibonacci projections")
+
+                except Exception as fib_error:
+                    print(f"\n⚠️  Could not calculate Fibonacci projections: {fib_error}")
+
+                # News sentiment (predictive)
+                try:
+                    from .predictive.news_sentiment import analyze_news_sentiment
+                    from .ui.display import display_news_sentiment
+
+                    # Get API key from settings
+                    user_settings = load_user_settings()
+                    api_key = None
+                    if user_settings and 'api_keys' in user_settings:
+                        api_key = user_settings['api_keys'].get('finnhub')
+
+                    if api_key:
+                        news = analyze_news_sentiment(ticker, api_key, days_back=1)
+                        if news:
+                            display_news_sentiment(news)
+                        else:
+                            print("\n📰 News Sentiment: No recent news available")
+                    else:
+                        print("\n📰 News Sentiment: Disabled (set FinnHub API key to enable)")
+
+                except Exception as news_error:
+                    print(f"\n⚠️  Could not fetch news sentiment: {news_error}")
+
+                # Insider trading (predictive - stocks only, not crypto)
+                # Dual-source: Polygon.io (primary) + SEC EDGAR (fallback)
+                try:
+                    from .predictive.insider_trading import analyze_insider_trading, is_crypto
+                    from .ui.display import display_insider_trading
+
+                    # Check if this is a stock (not crypto)
+                    if not is_crypto(ticker):
+                        # Try to get Polygon API key, fall back to SEC EDGAR if not available
+                        user_settings = load_user_settings()
+                        polygon_key = None
+                        if user_settings and 'api_keys' in user_settings:
+                            polygon_key = user_settings['api_keys'].get('polygon')
+
+                        insider = analyze_insider_trading(ticker, api_key=polygon_key, days_back=90)
+                        if insider:
+                            display_insider_trading(insider)
+                        else:
+                            print("\n👔 Insider Trading: No recent insider activity")
+                    else:
+                        # Crypto doesn't have insider trading
+                        pass
+
+                except Exception as insider_error:
+                    print(f"\n⚠️  Could not fetch insider trading data: {insider_error}")
+
             else:
                 print(f"❌ Failed to analyze {ticker}")
 
@@ -460,52 +537,6 @@ def run_darkflow_scan():
         print(f"\n❌ Dark Flow scan error: {e}")
         import traceback
         traceback.print_exc()
-
-
-def display_dark_flow_analysis(analysis: Dict):
-    """Display detailed Dark Flow analysis for a ticker"""
-    print("\n" + "=" * 80)
-    print(f"🌊 DARK FLOW ANALYSIS: {analysis['ticker']}")
-    print("=" * 80)
-
-    print(f"\n💰 CURRENT PRICE: ${analysis['current_price']:.2f}")
-    print(f"📊 TODAY'S OPEN: ${analysis['today_open']:.2f}")
-    print(f"📈 TODAY'S RANGE: ${analysis['today_low']:.2f} - ${analysis['today_high']:.2f}")
-    print(f"\n{analysis['bias_emoji']} BIAS: {analysis['bias']}")
-
-    if analysis['key_levels']:
-        print(f"\n🎯 KEY INSTITUTIONAL LEVELS (Volume Clusters):")
-        for i, level in enumerate(analysis['key_levels'][:5], 1):
-            distance = ((level - analysis['current_price']) / analysis['current_price']) * 100
-            if abs(distance) < 1:
-                marker = "⭐ ACTIVE"
-            elif distance > 0:
-                marker = "⬆️  RESISTANCE"
-            else:
-                marker = "⬇️  SUPPORT"
-            print(f"   {i}. ${level:.2f} ({distance:+.2f}%) {marker}")
-
-    if analysis['signals']:
-        print(f"\n🌊 DARK FLOW SIGNALS:")
-        for signal in analysis['signals']:
-            print(f"   • {signal['type']} at ${signal['level']:.2f}")
-
-    if analysis['unusual_volume']:
-        print(f"\n📊 UNUSUAL VOLUME ACTIVITY:")
-        for uv in analysis['unusual_volume'][-3:]:
-            print(f"   • {uv['time'].strftime('%Y-%m-%d %H:%M')}: ${uv['price']:.2f} - {uv['ratio']:.1f}x avg")
-
-    if analysis['gaps']:
-        print(f"\n⚡ PRICE GAPS:")
-        for gap in analysis['gaps'][-3:]:
-            print(f"   • {gap['direction']}: ${gap['gap_from']:.2f} → ${gap['gap_to']:.2f} ({gap['gap_pct']:.2f}%)")
-
-    if analysis['is_major_etf']:
-        print(f"\n⭐ MAJOR ETF - Prime candidate for institutional activity")
-
-    print("\n" + "=" * 80)
-    print("💡 Volume clusters indicate where institutions are actively trading")
-    print("=" * 80)
 
 
 def view_cache_status(cache):
@@ -774,6 +805,11 @@ def run_pressure_cooker_scan():
             print("\n⚠️  This may take several minutes - analyzing candidates for squeeze potential...")
 
             scanner = create_enhanced_pressure_cooker_scanner()
+
+            # Apply custom price range from user input
+            scanner.min_price = params.min_price
+            scanner.max_price = params.max_price
+
             start_time = datetime.now()
 
             results = scanner.scan_market(params, max_candidates=100)
@@ -827,7 +863,8 @@ def analyze_single_ticker():
     print("=" * 100)
 
     # Get ticker input
-    ticker = input("\nEnter ticker symbol (e.g., AAPL, TSLA): ").strip().upper()
+    ticker_input = input("\nEnter ticker symbol (e.g., AAPL, BTC, DOGE): ").strip()
+    ticker = normalize_ticker(ticker_input)  # Auto-add -USD for crypto
 
     if not ticker:
         print("❌ No ticker entered")
@@ -848,10 +885,6 @@ def analyze_single_ticker():
         if hist.empty:
             print(f"❌ No data available for {ticker}")
             return
-
-        # Fetch longer-term daily data for technical indicators (SMAs need more data points)
-        # For intraday traders, we still need daily data to calculate meaningful SMAs
-        hist_daily = stock.history(period='1y', interval='1d', prepost=True)
 
         # Current price and basic info
         current_price = hist['Close'].iloc[-1]
@@ -875,10 +908,18 @@ def analyze_single_ticker():
                 else:
                     extended_label = " [AFTER-HOURS]"
 
-        # Volume analysis
-        current_volume = hist['Volume'].iloc[-1]
-        avg_volume = hist['Volume'].tail(20).mean()
-        rel_vol = current_volume / avg_volume if avg_volume > 0 else 1.0
+        # Volume analysis - use stock.info for actual day's volume (not last candle)
+        # This fixes issue with 0 volume showing for intraday charts after hours
+        current_volume = info.get('volume') or info.get('regularMarketVolume', 0)
+        avg_volume = info.get('averageVolume') or info.get('averageVolume10days', 0)
+
+        # Fallback to historical data if info doesn't have volume
+        if current_volume == 0:
+            current_volume = hist['Volume'].iloc[-1]
+        if avg_volume == 0:
+            avg_volume = hist['Volume'].tail(20).mean()
+
+        rel_vol = current_volume / avg_volume if avg_volume > 0 else 0.0
 
         # Price analysis
         day_high = hist['High'].iloc[-1]
@@ -988,19 +1029,24 @@ def analyze_single_ticker():
         except:
             pass
 
-        # Moving Averages (key support/resistance levels)
-        # Calculate from daily data for meaningful SMAs even for intraday traders
+        # Moving Averages - calculated from SAME timeframe as chart
+        # For day traders: SMAs from 5-min candles, for swing traders: from daily, etc.
         try:
-            sma_20 = hist_daily['Close'].rolling(window=20).mean().iloc[-1] if len(hist_daily) >= 20 else None
-            sma_50 = hist_daily['Close'].rolling(window=50).mean().iloc[-1] if len(hist_daily) >= 50 else None
-            sma_200 = hist_daily['Close'].rolling(window=200).mean().iloc[-1] if len(hist_daily) >= 200 else None
+            sma_20 = hist['Close'].rolling(window=20).mean().iloc[-1] if len(hist) >= 20 else None
+            sma_50 = hist['Close'].rolling(window=50).mean().iloc[-1] if len(hist) >= 50 else None
+            sma_200 = hist['Close'].rolling(window=200).mean().iloc[-1] if len(hist) >= 200 else None
+
+            # Show timeframe context
+            timeframe_label = f"{style_config['chart_interval']}" if style_config['chart_interval'] != '1d' else 'daily'
 
             if sma_20:
-                print(f"   SMA(20):        ${sma_20:.2f} - {'ABOVE ✅' if current_price > sma_20 else 'BELOW ⚠️'}")
+                print(f"   SMA(20):        ${sma_20:.2f} ({timeframe_label}) - {'ABOVE ✅' if current_price > sma_20 else 'BELOW ⚠️'}")
             if sma_50:
-                print(f"   SMA(50):        ${sma_50:.2f} - {'ABOVE ✅' if current_price > sma_50 else 'BELOW ⚠️'}")
+                print(f"   SMA(50):        ${sma_50:.2f} ({timeframe_label}) - {'ABOVE ✅' if current_price > sma_50 else 'BELOW ⚠️'}")
             if sma_200:
-                print(f"   SMA(200):       ${sma_200:.2f} - {'ABOVE ✅' if current_price > sma_200 else 'BELOW ⚠️'}")
+                print(f"   SMA(200):       ${sma_200:.2f} ({timeframe_label}) - {'ABOVE ✅' if current_price > sma_200 else 'BELOW ⚠️'}")
+            elif len(hist) < 200:
+                print(f"   SMA(200):       Not enough data ({len(hist)} {timeframe_label} candles)")
 
             # Golden Cross / Death Cross detection
             if sma_20 and sma_200:

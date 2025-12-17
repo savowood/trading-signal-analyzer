@@ -2,7 +2,7 @@
 Result Display and Formatting
 Clean output formatting for scan results
 """
-from typing import List
+from typing import List, Dict
 from ..core.scanner import ScanResult
 from ..config import MAX_RESULTS_DISPLAY
 
@@ -291,6 +291,8 @@ def format_pillar_status(result: ScanResult, params) -> str:
 
 def prompt_ticker_selection(results: List[ScanResult]) -> List[str]:
     """Prompt user to select tickers for analysis"""
+    from ..utils import normalize_ticker
+
     if not results:
         return []
 
@@ -308,13 +310,13 @@ def prompt_ticker_selection(results: List[ScanResult]) -> List[str]:
 
     # Handle 'all'
     if choice.upper() == 'ALL':
-        return [r.ticker for r in results]
+        return [normalize_ticker(r.ticker) for r in results]
 
     # Handle 'top N'
     if choice.upper().startswith('TOP '):
         try:
             n = int(choice.split()[1])
-            return [r.ticker for r in results[:n]]
+            return [normalize_ticker(r.ticker) for r in results[:n]]
         except:
             print("❌ Invalid 'top N' format")
             return []
@@ -328,7 +330,8 @@ def prompt_ticker_selection(results: List[ScanResult]) -> List[str]:
             tickers = []
             for idx in indices:
                 if 1 <= idx <= len(results):
-                    tickers.append(results[idx - 1].ticker)
+                    # Normalize ticker (auto-add -USD for crypto)
+                    tickers.append(normalize_ticker(results[idx - 1].ticker))
                 else:
                     print(f"⚠️  Index {idx} out of range (1-{len(results)})")
             return tickers
@@ -336,16 +339,17 @@ def prompt_ticker_selection(results: List[ScanResult]) -> List[str]:
         pass
 
     # Fall back to parsing as ticker symbols
-    tickers = [t.strip().upper() for t in choice.split(',')]
+    tickers = [normalize_ticker(t.strip()) for t in choice.split(',')]
 
-    # Validate tickers exist in results
+    # Validate tickers exist in results (check both normalized and original)
     valid_tickers = {r.ticker for r in results}
-    invalid = [t for t in tickers if t not in valid_tickers]
+    valid_tickers_normalized = {normalize_ticker(r.ticker) for r in results}
+    invalid = [t for t in tickers if t not in valid_tickers and t not in valid_tickers_normalized]
 
     if invalid:
         print(f"⚠️  Unknown tickers: {', '.join(invalid)}")
 
-    return [t for t in tickers if t in valid_tickers]
+    return [t for t in tickers if t in valid_tickers or t in valid_tickers_normalized]
 
 
 def display_technical_analysis(analysis):
@@ -401,12 +405,22 @@ def display_technical_analysis(analysis):
     print(f"  SuperTrend:       ${analysis.supertrend:.2f}")
     print(f"  Signal:           {analysis.supertrend_signal}")
 
-    # EMAs
+    # EMAs and SMAs
     print(f"\n📊 MOVING AVERAGES")
     print(f"{'=' * 100}")
     print(f"  EMA 9:            ${analysis.ema9:.2f}")
     print(f"  EMA 20:           ${analysis.ema20:.2f}")
     print(f"  Crossover:        {analysis.ema_crossover}")
+
+    # SMAs
+    if analysis.sma_20:
+        print(f"  SMA 20:           ${analysis.sma_20:.2f}")
+    if analysis.sma_50:
+        print(f"  SMA 50:           ${analysis.sma_50:.2f}")
+    if analysis.sma_200:
+        print(f"  SMA 200:          ${analysis.sma_200:.2f}")
+    if analysis.sma_trend and analysis.sma_trend != "Neutral":
+        print(f"  Trend:            {analysis.sma_trend}")
 
     # Volume
     print(f"\n📦 VOLUME")
@@ -797,3 +811,374 @@ def display_pressure_cooker_details(result: ScanResult):
         print("   ⚠️  All Pressure Cooker setups are high-risk - use caution")
 
     print("\n" + "=" * 100)
+
+
+def display_dark_flow_analysis(analysis: Dict):
+    """Display detailed Dark Flow analysis for a ticker with PREDICTIVE features"""
+    print("\n" + "=" * 80)
+    print(f"🌊 DARK FLOW ANALYSIS: {analysis['ticker']}")
+    print("=" * 80)
+
+    print(f"\n💰 CURRENT PRICE: ${analysis['current_price']:.2f}")
+    print(f"📊 TODAY'S OPEN: ${analysis['today_open']:.2f}")
+    print(f"📈 TODAY'S RANGE: ${analysis['today_low']:.2f} - ${analysis['today_high']:.2f}")
+
+    # Enhanced bias with confidence
+    bias_confidence = analysis.get('bias_confidence', 'Medium')
+    print(f"\n{analysis['bias_emoji']} BIAS: {analysis['bias']} (Confidence: {bias_confidence})")
+
+    # PREDICTIVE: POC Migration
+    if 'poc_migration' in analysis and analysis['poc_migration']:
+        poc_data = analysis['poc_migration']
+        if 'trend' in poc_data:
+            print(f"\n🔮 POC MIGRATION (PREDICTIVE):")
+            print(f"   Trend: {poc_data['trend']}")
+            if 'change_pct' in poc_data:
+                print(f"   Previous POC: ${poc_data['previous_poc']:.2f}")
+                print(f"   Recent POC: ${poc_data['recent_poc']:.2f} ({poc_data['change_pct']:+.2f}%)")
+
+    # PREDICTIVE: Value Area
+    if 'value_area' in analysis and analysis['value_area']:
+        va = analysis['value_area']
+        if 'POC' in va:
+            print(f"\n📊 VALUE AREA (68.2% of Volume - PREDICTIVE):")
+            print(f"   POC (Point of Control): ${va['POC']:.2f}")
+            if 'VAH' in va and 'VAL' in va:
+                current_price = analysis['current_price']
+                print(f"   VAH (Value Area High): ${va['VAH']:.2f}")
+                print(f"   VAL (Value Area Low):  ${va['VAL']:.2f}")
+
+                # Predict price behavior based on position
+                if current_price > va['VAH']:
+                    print(f"   ⚠️  Price ABOVE value area - expect pullback to VAH ${va['VAH']:.2f}")
+                elif current_price < va['VAL']:
+                    print(f"   ⚠️  Price BELOW value area - expect bounce to VAL ${va['VAL']:.2f}")
+                else:
+                    print(f"   ✅ Price WITHIN value area - normal trading range")
+
+    # PREDICTIVE: Volume Imbalances
+    if 'volume_imbalances' in analysis and analysis['volume_imbalances']:
+        print(f"\n🎯 VOLUME IMBALANCES (Price Magnets - PREDICTIVE):")
+        for imb in analysis['volume_imbalances'][:3]:
+            distance = ((imb['price'] - analysis['current_price']) / analysis['current_price']) * 100
+            if distance > 0:
+                direction = "⬆️  UPSIDE TARGET"
+            else:
+                direction = "⬇️  DOWNSIDE TARGET"
+            print(f"   • ${imb['price']:.2f} ({distance:+.2f}%) {direction}")
+        print(f"   💡 Low volume zones = price moves quickly through them")
+
+    if analysis['key_levels']:
+        print(f"\n🎯 KEY INSTITUTIONAL LEVELS (Volume Clusters):")
+        for i, level in enumerate(analysis['key_levels'][:5], 1):
+            distance = ((level - analysis['current_price']) / analysis['current_price']) * 100
+            if abs(distance) < 1:
+                marker = "⭐ ACTIVE"
+            elif distance > 0:
+                marker = "⬆️  RESISTANCE"
+            else:
+                marker = "⬇️  SUPPORT"
+            print(f"   {i}. ${level:.2f} ({distance:+.2f}%) {marker}")
+
+    if analysis['signals']:
+        print(f"\n🌊 DARK FLOW SIGNALS:")
+        for signal in analysis['signals']:
+            print(f"   • {signal['type']} at ${signal['level']:.2f}")
+
+    if analysis['unusual_volume']:
+        print(f"\n📊 UNUSUAL VOLUME ACTIVITY:")
+        for uv in analysis['unusual_volume'][-3:]:
+            print(f"   • {uv['time'].strftime('%Y-%m-%d %H:%M')}: ${uv['price']:.2f} - {uv['ratio']:.1f}x avg")
+
+    if analysis['gaps']:
+        print(f"\n⚡ PRICE GAPS:")
+        for gap in analysis['gaps'][-3:]:
+            print(f"   • {gap['direction']}: ${gap['gap_from']:.2f} → ${gap['gap_to']:.2f} ({gap['gap_pct']:.2f}%)")
+
+    if analysis['is_major_etf']:
+        print(f"\n⭐ MAJOR ETF - Prime candidate for institutional activity")
+
+    print("\n" + "=" * 80)
+    print("💡 REACTIVE: Volume clusters show where institutions HAVE BEEN")
+    print("💡 PREDICTIVE: Value Area, POC migration, and imbalances predict where price WILL GO")
+    print("=" * 80)
+
+
+def display_fibonacci_analysis(fib):
+    """
+    Display Fibonacci projection analysis
+
+    Args:
+        fib: FibonacciLevels object
+    """
+    if fib is None:
+        print("\n⚠️  Insufficient data for Fibonacci analysis")
+        return
+
+    print(f"\n{'=' * 100}")
+    print(f"🎯 FIBONACCI PROJECTIONS - {fib.ticker}")
+    print(f"{'=' * 100}")
+
+    # Current status
+    print(f"\n📍 CURRENT POSITION")
+    print(f"  Current Price:    ${fib.current_price:.2f}")
+    print(f"  Trend:            {fib.trend_direction}")
+    print(f"  Prediction:       {fib.prediction}")
+    print(f"  Confidence:       {fib.confidence}")
+
+    # Time to target (PREDICTIVE)
+    if fib.estimated_days_to_target and fib.target_date_range:
+        print(f"\n⏰ TIME TO TARGET (PREDICTIVE)")
+        print(f"  Estimated:        {fib.estimated_days_to_target} days")
+        print(f"  Date Range:       {fib.target_date_range}")
+        if fib.momentum_per_day:
+            print(f"  Momentum:         ${fib.momentum_per_day:.2f}/day")
+
+    # Swing points
+    print(f"\n📊 SWING POINTS (Analysis Range)")
+    print(f"  Swing High:       ${fib.swing_high:.2f} ({fib.swing_high_date})")
+    print(f"  Swing Low:        ${fib.swing_low:.2f} ({fib.swing_low_date})")
+    price_range = fib.swing_high - fib.swing_low
+    print(f"  Range:            ${price_range:.2f}")
+
+    # Key support/resistance
+    print(f"\n🎯 KEY LEVELS")
+    print(f"  Nearest Support:  ${fib.nearest_support:.2f} ({((fib.current_price - fib.nearest_support) / fib.current_price * 100):.1f}% away)")
+    print(f"  Nearest Resistance: ${fib.nearest_resistance:.2f} ({((fib.nearest_resistance - fib.current_price) / fib.current_price * 100):.1f}% away)")
+
+    # Retracement levels
+    print(f"\n🔽 FIBONACCI RETRACEMENTS (Pullback Zones)")
+    print(f"{'Level':<15} {'Price':<12} {'Status':<20}")
+    print(f"{'-' * 47}")
+
+    sorted_retracements = sorted(fib.retracements.items(),
+                                key=lambda x: x[1],
+                                reverse=(fib.trend_direction == "Uptrend"))
+
+    for level_name, price in sorted_retracements:
+        if abs(fib.current_price - price) / price < 0.02:
+            status = "← CURRENT LEVEL"
+            marker = "🔵"
+        elif price < fib.current_price:
+            status = "Support below"
+            marker = "  "
+        else:
+            status = "Resistance above"
+            marker = "  "
+
+        print(f"{marker} {level_name:<13} ${price:<10.2f} {status}")
+
+    # Extension levels (price targets)
+    print(f"\n🎯 FIBONACCI EXTENSIONS (Price Targets)")
+    print(f"{'Level':<15} {'Price':<12} {'Status':<20}")
+    print(f"{'-' * 47}")
+
+    sorted_extensions = sorted(fib.extensions.items(),
+                              key=lambda x: x[1],
+                              reverse=(fib.trend_direction == "Downtrend"))
+
+    for level_name, price in sorted_extensions:
+        if fib.next_target and level_name == fib.next_target:
+            status = "← NEXT TARGET"
+            marker = "🎯"
+        elif fib.trend_direction == "Uptrend" and price > fib.current_price:
+            status = "Target above"
+            marker = "  "
+        elif fib.trend_direction == "Downtrend" and price < fib.current_price:
+            status = "Target below"
+            marker = "  "
+        else:
+            status = "Completed"
+            marker = "✅"
+
+        print(f"{marker} {level_name:<13} ${price:<10.2f} {status}")
+
+    # Trading guidance
+    print(f"\n💡 FIBONACCI TRADING GUIDANCE")
+    print(f"{'=' * 100}")
+    if fib.trend_direction == "Uptrend":
+        print(f"  • Watch for bounces at retracement levels (especially 61.8% and 50%)")
+        print(f"  • Next upside target: {fib.next_target or 'Above current range'}")
+        print(f"  • Consider profit-taking near extension levels")
+    else:
+        print(f"  • Watch for resistance at retracement levels (especially 61.8% and 50%)")
+        print(f"  • Next downside target: {fib.next_target or 'Below current range'}")
+        print(f"  • Consider entries on retracement bounces")
+
+    print(f"{'=' * 100}")
+
+
+def display_news_sentiment(news):
+    """Display news sentiment analysis"""
+    from ..predictive.news_sentiment import NewsSentiment
+
+    if not news or not isinstance(news, NewsSentiment):
+        return
+
+    print(f"\n{'━' * 100}")
+    print(f"🔮 PREDICTIVE INDICATOR - NEWS SENTIMENT")
+    print(f"{'━' * 100}")
+
+    # Overall sentiment with emoji
+    sentiment_emoji = {
+        "Bullish": "🟢",
+        "Bearish": "🔴",
+        "Neutral": "⚪",
+        "Mixed": "🟡"
+    }.get(news.overall_sentiment, "⚪")
+
+    print(f"\n📰 NEWS SENTIMENT ({news.time_range})")
+    print(f"   Overall Sentiment:     {sentiment_emoji} {news.overall_sentiment.upper()}")
+    print(f"   Positive Articles:     {news.positive_count}")
+    print(f"   Negative Articles:     {news.negative_count}")
+    print(f"   Neutral Articles:      {news.neutral_count}")
+    print(f"   Sentiment Score:       {news.sentiment_score:+.2f} ", end="")
+
+    # Score interpretation
+    if news.sentiment_score > 0.6:
+        print("(Very Positive)")
+    elif news.sentiment_score > 0.3:
+        print("(Positive)")
+    elif news.sentiment_score < -0.6:
+        print("(Very Negative)")
+    elif news.sentiment_score < -0.3:
+        print("(Negative)")
+    else:
+        print("(Neutral)")
+
+    # Recent headlines
+    if news.recent_articles:
+        print(f"\n   Recent Headlines:")
+        for i, article in enumerate(news.recent_articles[:3], 1):  # Show top 3
+            # Sentiment emoji for article
+            if article.sentiment > 0.2:
+                article_emoji = "✅"
+            elif article.sentiment < -0.2:
+                article_emoji = "❌"
+            else:
+                article_emoji = "➖"
+
+            # Truncate headline if too long
+            headline = article.headline
+            if len(headline) > 70:
+                headline = headline[:67] + "..."
+
+            print(f"   {article_emoji} \"{headline}\" ({article.time_ago()})")
+            print(f"      Sentiment: ", end="")
+
+            if article.sentiment > 0.5:
+                print(f"Very Positive ({article.sentiment:+.2f})")
+            elif article.sentiment > 0.2:
+                print(f"Positive ({article.sentiment:+.2f})")
+            elif article.sentiment < -0.5:
+                print(f"Very Negative ({article.sentiment:+.2f})")
+            elif article.sentiment < -0.2:
+                print(f"Negative ({article.sentiment:+.2f})")
+            else:
+                print(f"Neutral ({article.sentiment:+.2f})")
+
+    # Interpretation
+    print(f"\n   💡 INTERPRETATION:")
+    print(f"      {news.interpretation}")
+
+    # Confidence
+    print(f"   Confidence Level:      {news.confidence}")
+
+    print(f"\n{'=' * 100}")
+
+
+def display_insider_trading(insider):
+    """Display insider trading analysis"""
+    from trading_analyzer.predictive.insider_trading import InsiderAnalysis
+
+    if not insider or not isinstance(insider, InsiderAnalysis):
+        return
+
+    print(f"\n{'━' * 100}")
+    print(f"🔮 PREDICTIVE INDICATOR - INSIDER TRADING")
+    print(f"{'━' * 100}")
+
+    # Signal with emoji
+    signal_emoji = {
+        "Strong Buy": "🟢🟢",
+        "Buy": "🟢",
+        "Neutral": "⚪",
+        "Sell": "🔴",
+        "Strong Sell": "🔴🔴"
+    }.get(insider.signal, "⚪")
+
+    print(f"\n👔 INSIDER ACTIVITY ({insider.time_range})")
+    print(f"   Signal:                {signal_emoji} {insider.signal.upper()}")
+    print(f"   Confidence:            {insider.confidence}")
+
+    # Transaction summary
+    print(f"\n   Transaction Summary:")
+    print(f"   • Total Transactions:  {insider.total_transactions}")
+    print(f"   • Buy Transactions:    {insider.buy_transactions}")
+    print(f"   • Sell Transactions:   {insider.sell_transactions}")
+
+    # Dollar values
+    def format_money(value):
+        if value >= 1_000_000:
+            return f"${value/1_000_000:.1f}M"
+        elif value >= 1_000:
+            return f"${value/1_000:.0f}K"
+        else:
+            return f"${value:.0f}"
+
+    print(f"\n   Dollar Values:")
+    print(f"   • Total Buys:          {format_money(insider.total_buy_value)}")
+    print(f"   • Total Sells:         {format_money(insider.total_sell_value)}")
+
+    net_emoji = "🟢" if insider.net_activity > 0 else "🔴" if insider.net_activity < 0 else "⚪"
+    print(f"   • Net Activity:        {net_emoji} {format_money(abs(insider.net_activity))} ", end="")
+    print(f"({'Net Buying' if insider.net_activity > 0 else 'Net Selling' if insider.net_activity < 0 else 'Balanced'})")
+
+    # Key insiders
+    if insider.key_buyers:
+        print(f"\n   Key Buyers (>$100K):")
+        for buyer in insider.key_buyers[:3]:
+            print(f"   ✅ {buyer}")
+
+    if insider.key_sellers:
+        print(f"\n   Key Sellers (>$500K):")
+        for seller in insider.key_sellers[:3]:
+            print(f"   ❌ {seller}")
+
+    # Recent transactions
+    if insider.recent_transactions:
+        print(f"\n   Recent Transactions:")
+        for i, trans in enumerate(insider.recent_transactions[:5], 1):  # Show top 5
+            trans_emoji = "✅" if trans.is_buy() else "❌" if trans.is_sell() else "➖"
+            trans_type = "BUY" if trans.is_buy() else "SELL" if trans.is_sell() else trans.transaction_type
+
+            # Format transaction
+            value_str = format_money(trans.value)
+            shares_str = f"{trans.shares:,}" if trans.shares < 1_000_000 else f"{trans.shares/1_000_000:.1f}M"
+
+            print(f"   {trans_emoji} {trans.transaction_date} - {trans_type} - {shares_str} shares - {value_str}")
+            print(f"      {trans.insider_name} ({trans.insider_title})")
+
+    # Interpretation
+    print(f"\n   💡 INTERPRETATION:")
+
+    # Wrap interpretation text to fit width
+    interpretation = insider.interpretation
+    max_width = 94  # 100 - 6 for indent
+    words = interpretation.split()
+    lines = []
+    current_line = ""
+
+    for word in words:
+        if len(current_line) + len(word) + 1 <= max_width:
+            current_line += (word + " ")
+        else:
+            lines.append(current_line.strip())
+            current_line = word + " "
+    if current_line:
+        lines.append(current_line.strip())
+
+    for line in lines:
+        print(f"      {line}")
+
+    print(f"\n{'=' * 100}")

@@ -193,7 +193,13 @@ class DarkFlowScanner(Scanner):
         return results
 
     def analyze_institutional_levels(self, ticker: str, period: str = "5d") -> Optional[Dict]:
-        """Analyze volume profile to detect institutional activity levels"""
+        """
+        Analyze volume profile to detect institutional activity levels
+        NOW WITH PREDICTIVE FEATURES:
+        - Value Area (POC, VAH, VAL)
+        - Volume Imbalances (price magnets)
+        - POC Migration (institutional trend)
+        """
         try:
             stock = yf.Ticker(ticker)
             df = stock.history(period=period, interval="1h", prepost=True)
@@ -210,6 +216,15 @@ class DarkFlowScanner(Scanner):
             volume_profile = self._create_volume_profile(df)
             key_levels = self._find_key_levels(volume_profile, current_price)
 
+            # PREDICTIVE: Value Area calculation
+            value_area = self._calculate_value_area(volume_profile)
+
+            # PREDICTIVE: Volume imbalances (price magnets)
+            volume_imbalances = self._detect_volume_imbalances(volume_profile)
+
+            # PREDICTIVE: POC migration analysis
+            poc_migration = self._analyze_poc_migration(df)
+
             # Detect signals
             signals = []
             for level in key_levels[:3]:
@@ -223,7 +238,18 @@ class DarkFlowScanner(Scanner):
             unusual_volume = self._detect_unusual_volume(df)
             gaps = self._detect_gaps(df)
 
-            bias = "BULLISH" if current_price > today_open else "BEARISH"
+            # Enhanced bias using POC migration
+            base_bias = "BULLISH" if current_price > today_open else "BEARISH"
+            poc_bias = poc_migration.get('bias', 'NEUTRAL')
+
+            # Combine biases for stronger signal
+            if base_bias == poc_bias:
+                bias = base_bias
+                confidence = "High"
+            else:
+                bias = base_bias
+                confidence = "Low"
+
             bias_emoji = "🟢" if bias == "BULLISH" else "🔴"
 
             return {
@@ -234,11 +260,16 @@ class DarkFlowScanner(Scanner):
                 'today_low': today_low,
                 'bias': bias,
                 'bias_emoji': bias_emoji,
+                'bias_confidence': confidence,
                 'key_levels': key_levels[:5],
                 'signals': signals,
                 'unusual_volume': unusual_volume,
                 'gaps': gaps,
-                'is_major_etf': ticker in self.major_etfs
+                'is_major_etf': ticker in self.major_etfs,
+                # PREDICTIVE DATA
+                'value_area': value_area,
+                'volume_imbalances': volume_imbalances[:3],  # Top 3 imbalances
+                'poc_migration': poc_migration
             }
         except Exception:
             return None
@@ -316,7 +347,15 @@ class DarkFlowScanner(Scanner):
         return min(score, 100)
 
     def _create_volume_profile(self, df: pd.DataFrame, bins: int = 20) -> pd.DataFrame:
-        """Create volume profile"""
+        """
+        Create enhanced volume profile with Value Area analysis
+
+        Returns DataFrame with columns:
+        - bin: price bin number
+        - volume: total volume in that bin
+        - price: average price in that bin
+        - cumulative_volume_pct: cumulative volume percentage (for Value Area)
+        """
         price_range = df['Close'].max() - df['Close'].min()
         if price_range == 0:
             return pd.DataFrame()
@@ -330,7 +369,13 @@ class DarkFlowScanner(Scanner):
         }).reset_index()
 
         volume_profile.columns = ['bin', 'volume', 'price']
+
+        # Calculate cumulative volume percentage (for Value Area)
+        total_volume = volume_profile['volume'].sum()
         volume_profile = volume_profile.sort_values('volume', ascending=False)
+        volume_profile['cumulative_volume_pct'] = (
+            volume_profile['volume'].cumsum() / total_volume * 100
+        )
 
         return volume_profile
 
@@ -377,6 +422,126 @@ class DarkFlowScanner(Scanner):
                 })
 
         return gaps
+
+    def _calculate_value_area(self, volume_profile: pd.DataFrame) -> Dict:
+        """
+        Calculate Value Area (PREDICTIVE)
+
+        Value Area = 68.2% of volume distribution (1 standard deviation)
+        POC = Point of Control (highest volume price)
+        VAH = Value Area High
+        VAL = Value Area Low
+
+        Returns:
+            Dict with POC, VAH, VAL, and predictive bias
+        """
+        if volume_profile.empty:
+            return {}
+
+        # POC = highest volume price
+        poc_row = volume_profile.iloc[0]
+        poc_price = poc_row['price']
+
+        # Value Area = prices containing 68.2% of volume
+        value_area_threshold = 68.2
+        value_area_rows = volume_profile[
+            volume_profile['cumulative_volume_pct'] <= value_area_threshold
+        ]
+
+        if value_area_rows.empty:
+            return {'POC': poc_price}
+
+        # VAH = highest price in value area
+        # VAL = lowest price in value area
+        vah = value_area_rows['price'].max()
+        val = value_area_rows['price'].min()
+
+        return {
+            'POC': poc_price,
+            'VAH': vah,
+            'VAL': val,
+            'value_area_range': vah - val
+        }
+
+    def _detect_volume_imbalances(self, volume_profile: pd.DataFrame) -> List[Dict]:
+        """
+        Detect volume imbalances (PREDICTIVE)
+
+        Low volume areas act as "price magnets" - price tends to move quickly through them.
+        These are predictive targets when price approaches them.
+
+        Returns:
+            List of volume imbalance zones
+        """
+        if volume_profile.empty or len(volume_profile) < 5:
+            return []
+
+        # Find bins with abnormally low volume (bottom 20%)
+        volume_threshold = volume_profile['volume'].quantile(0.20)
+
+        # Sort by price to identify contiguous zones
+        sorted_profile = volume_profile.sort_values('price')
+
+        imbalances = []
+        for idx, row in sorted_profile.iterrows():
+            if row['volume'] < volume_threshold:
+                imbalances.append({
+                    'price': row['price'],
+                    'volume': row['volume'],
+                    'type': 'Volume Imbalance',
+                    'prediction': 'Price magnet - expect rapid movement'
+                })
+
+        return imbalances
+
+    def _analyze_poc_migration(self, df: pd.DataFrame, window_days: int = 5) -> Dict:
+        """
+        Analyze POC migration over time (PREDICTIVE)
+
+        Rising POC = institutions accumulating higher (bullish)
+        Falling POC = institutions distributing lower (bearish)
+
+        Returns:
+            POC trend analysis
+        """
+        if len(df) < window_days * 2:
+            return {'trend': 'Insufficient data'}
+
+        # Split into recent and previous periods
+        mid_point = len(df) // 2
+        recent_df = df.iloc[mid_point:]
+        previous_df = df.iloc[:mid_point]
+
+        # Calculate POC for each period
+        recent_profile = self._create_volume_profile(recent_df, bins=20)
+        previous_profile = self._create_volume_profile(previous_df, bins=20)
+
+        if recent_profile.empty or previous_profile.empty:
+            return {'trend': 'Insufficient data'}
+
+        recent_poc = recent_profile.iloc[0]['price']
+        previous_poc = previous_profile.iloc[0]['price']
+
+        poc_change_pct = ((recent_poc - previous_poc) / previous_poc) * 100
+
+        # Determine trend
+        if poc_change_pct > 2:
+            trend = "Rising POC (Bullish Accumulation)"
+            bias = "BULLISH"
+        elif poc_change_pct < -2:
+            trend = "Falling POC (Bearish Distribution)"
+            bias = "BEARISH"
+        else:
+            trend = "Stable POC (Neutral)"
+            bias = "NEUTRAL"
+
+        return {
+            'trend': trend,
+            'bias': bias,
+            'previous_poc': previous_poc,
+            'recent_poc': recent_poc,
+            'change_pct': poc_change_pct
+        }
 
 
 def create_darkflow_scanner() -> DarkFlowScanner:

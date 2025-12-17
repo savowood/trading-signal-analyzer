@@ -26,6 +26,7 @@ from .technical import (
 from .charts import ASCIIChartGenerator, ChartConfig
 from .export import ResultExporter
 from .validation import DataValidator, ValidationResult, ValidationIssue
+from .ticker_utils import normalize_ticker, is_crypto_ticker, normalize_ticker_list
 
 __all__ = [
     # Parallel processing
@@ -56,4 +57,9 @@ __all__ = [
     'DataValidator',
     'ValidationResult',
     'ValidationIssue',
+
+    # Ticker utilities
+    'normalize_ticker',
+    'is_crypto_ticker',
+    'normalize_ticker_list',
 ]

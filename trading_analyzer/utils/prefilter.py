@@ -82,6 +82,30 @@ class SmartPreFilter:
                 float_shares = info.get('floatShares', 0)
                 market_cap = info.get('marketCap', 0)
 
+                # Check if stock is actively tradeable (not delisted/acquired)
+                quote_type = info.get('quoteType', '')
+                exchange = info.get('exchange', '')
+
+                # Reject if not a tradeable equity
+                if quote_type not in ['EQUITY', 'ETF']:
+                    self._record_rejection('not_equity')
+                    return False, f"Not a tradeable equity (type: {quote_type})"
+
+                # Reject if no valid exchange (delisted stocks often have no exchange)
+                if not exchange or exchange in ['', 'NONE', 'None', None]:
+                    self._record_rejection('no_exchange')
+                    return False, "No valid exchange (possibly delisted)"
+
+                # Reject if volume is zero (not actively trading)
+                if volume == 0:
+                    self._record_rejection('zero_volume')
+                    return False, "Zero volume (not actively trading)"
+
+                # Reject if price is zero or null (delisted/suspended)
+                if not current_price or current_price == 0:
+                    self._record_rejection('zero_price')
+                    return False, "No valid price (possibly delisted)"
+
                 # Quick rejection checks
                 if current_price < self.criteria.min_price:
                     self._record_rejection('price_too_low')

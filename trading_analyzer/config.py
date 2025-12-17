@@ -24,7 +24,9 @@ API_KEYS = {
     'alphavantage': None,
     'newsapi': None,
     'reddit_client_id': None,
-    'reddit_client_secret': None
+    'reddit_client_secret': None,
+    'finnhub': None,  # For news sentiment analysis
+    'fmp': None,      # Financial Modeling Prep - for insider trading
 }
 
 # Cache settings (in seconds)
@@ -312,7 +314,7 @@ TRADING_STYLES = {
         'description': 'Same-day trades, close before market close',
         'typical_duration': 'Hours (same day)',
         'hold_time': '30m - 6h',
-        'chart_period': '1d',           # 1 day (24 hours)
+        'chart_period': '2d',           # 2 days to get 200+ candles for SMA 200
         'chart_interval': '5m',         # 5-minute candles
         'default_rr': 2.0,              # 1:2 risk/reward
         'indicators': ['VWAP', 'MACD', 'RSI', 'Volume']
@@ -348,6 +350,51 @@ TRADING_STYLES = {
         'indicators': ['Fundamentals', 'Long-term Trends', 'Dividends']
     }
 }
+
+
+def get_technical_analysis_params(trading_style: str = None) -> dict:
+    """
+    Get appropriate period/interval for technical analysis based on trading style
+
+    For technical indicators (RSI, MACD, etc.), we use:
+    - Scalper/Day Trader: 5-minute interval to match Webull/FinViz intraday charts
+    - Swing/Position: Daily interval for medium-term trends
+    - Long-term: Weekly interval for big picture
+
+    Args:
+        trading_style: Trading style key from TRADING_STYLES
+
+    Returns:
+        Dict with 'period' and 'interval' for technical analysis
+    """
+    if not trading_style or trading_style not in TRADING_STYLES:
+        trading_style = DEFAULT_TRADING_STYLE
+
+    # Map trading style to technical analysis timeframe
+    ta_params = {
+        'scalper': {
+            'period': '2d',    # 2 days of data
+            'interval': '5m'   # 5-minute candles for scalping
+        },
+        'day_trader': {
+            'period': '5d',    # 5 days of data
+            'interval': '5m'   # 5-minute candles (matches Webull/FinViz intraday)
+        },
+        'swing_trader': {
+            'period': '3mo',   # 3 months of data
+            'interval': '1d'   # Daily candles
+        },
+        'position_trader': {
+            'period': '1y',    # 1 year of data
+            'interval': '1d'   # Daily candles
+        },
+        'long_term': {
+            'period': '5y',    # 5 years of data
+            'interval': '1wk'  # Weekly candles
+        }
+    }
+
+    return ta_params.get(trading_style, ta_params['swing_trader'])
 
 # Risk/Reward ratio presets
 RR_RATIOS = {
