@@ -624,11 +624,28 @@ class ForexProvider(Scanner):
 
 
 class CryptoProvider(Scanner):
-    """Cryptocurrency scanner"""
+    """Cryptocurrency scanner with optional FinViz enhancement"""
 
     def __init__(self):
         super().__init__("CRYPTO")
         self.cache = get_cache_manager()
+
+        # Optional: FinViz Elite crypto enhancement
+        self.finviz_provider = None
+        try:
+            # Load FinViz API key directly from settings
+            from ..config import load_user_settings
+            settings = load_user_settings()
+
+            if settings and 'api_keys' in settings:
+                finviz_key = settings['api_keys'].get('finviz')
+
+                if finviz_key and finviz_key.strip():
+                    from .finviz_crypto import FinVizCryptoProvider
+                    self.finviz_provider = FinVizCryptoProvider(finviz_key.strip())
+                    print("      💎 FinViz Elite crypto enhancement available")
+        except Exception as e:
+            pass  # FinViz not available, continue with standard scan
 
     def scan(self, params: ScanParameters) -> List[ScanResult]:
         """Scan crypto pairs for momentum"""
@@ -646,6 +663,23 @@ class CryptoProvider(Scanner):
             result = self._check_crypto(ticker, name)
             if result:
                 results.append(result)
+
+        # Optional: Enhance with FinViz multi-timeframe performance
+        if self.finviz_provider:
+            print(f"      💎 Enhancing with FinViz multi-timeframe data...")
+            try:
+                finviz_data = self.finviz_provider.get_crypto_performance()
+
+                for result in results:
+                    # Normalize ticker (BTC-USD -> BTC)
+                    ticker_short = result.ticker.replace('-USD', '').upper()
+
+                    finviz_perf = finviz_data.get(ticker_short)
+                    if finviz_perf:
+                        # Store FinViz performance in result for display
+                        result.finviz_perf = finviz_perf
+            except Exception as e:
+                print(f"      ⚠️  FinViz enhancement failed: {e}")
 
         # Sort by activity score
         results.sort(key=lambda x: getattr(x, 'activity_score', 0), reverse=True)

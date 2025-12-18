@@ -389,7 +389,66 @@ def analyze_selected_tickers(tickers):
                             print("\n👔 Insider Trading: No recent insider activity")
                     else:
                         # Crypto doesn't have insider trading
-                        pass
+                        # But may have FinViz multi-timeframe performance
+                        try:
+                            from .data.finviz_crypto import FinVizCryptoProvider
+
+                            # Load FinViz API key
+                            user_settings = load_user_settings()
+                            if user_settings and 'api_keys' in user_settings:
+                                finviz_key = user_settings['api_keys'].get('finviz')
+
+                                if finviz_key and finviz_key.strip():
+                                    print("\n💎 FINVIZ MULTI-TIMEFRAME PERFORMANCE")
+                                    print("=" * 100)
+
+                                    provider = FinVizCryptoProvider(finviz_key.strip())
+                                    # Normalize ticker (BTC-USD -> BTC)
+                                    ticker_short = ticker.replace('-USD', '').replace('USD', '').upper()
+                                    perf = provider.get_performance_for_ticker(ticker_short)
+
+                                    if perf:
+                                        # Display performance data
+                                        print(f"   5 Min:          {perf.get('perf_5min', 'N/A'):>+7}%")
+                                        print(f"   1 Hour:         {perf.get('perf_hour', 'N/A'):>+7}%")
+                                        print(f"   1 Day:          {perf.get('perf_day', 'N/A'):>+7}%")
+                                        print(f"   1 Week:         {perf.get('perf_week', 'N/A'):>+7}%")
+                                        print(f"   1 Month:        {perf.get('perf_month', 'N/A'):>+7}%")
+                                        print(f"   Quarter:        {perf.get('perf_quarter', 'N/A'):>+7}%")
+                                        print(f"   Half Year:      {perf.get('perf_half', 'N/A'):>+7}%")
+                                        print(f"   YTD:            {perf.get('perf_ytd', 'N/A'):>+7}%")
+                                        print(f"   1 Year:         {perf.get('perf_year', 'N/A'):>+7}%")
+
+                                        # Multi-timeframe trend analysis
+                                        print(f"\n📈 MULTI-TIMEFRAME TREND ANALYSIS")
+
+                                        # Calculate averages (excluding YTD as it's variable)
+                                        short_term = [perf.get('perf_5min', 0), perf.get('perf_hour', 0), perf.get('perf_day', 0)]
+                                        short_avg = sum(short_term) / len([x for x in short_term if x]) if any(short_term) else 0
+
+                                        mid_term = [perf.get('perf_week', 0), perf.get('perf_month', 0)]
+                                        mid_avg = sum(mid_term) / len([x for x in mid_term if x]) if any(mid_term) else 0
+
+                                        long_term = [perf.get('perf_quarter', 0), perf.get('perf_half', 0), perf.get('perf_year', 0)]
+                                        long_avg = sum(long_term) / len([x for x in long_term if x]) if any(long_term) else 0
+
+                                        print(f"   Short-term (5min-day): {short_avg:+.1f}% avg")
+                                        print(f"   Mid-term (week-month): {mid_avg:+.1f}% avg")
+                                        print(f"   Long-term (qtr-year):  {long_avg:+.1f}% avg")
+
+                                        # Momentum assessment
+                                        if short_avg > 0 and mid_avg > 0:
+                                            print(f"\n   ✅ Positive momentum across timeframes")
+                                        elif short_avg > 0 > mid_avg:
+                                            print(f"\n   ⚠️  Short-term bounce in longer downtrend")
+                                        elif short_avg < 0 < mid_avg:
+                                            print(f"\n   ⚠️  Short-term pullback in longer uptrend")
+                                        else:
+                                            print(f"\n   ❌ Negative momentum across timeframes")
+                                    else:
+                                        print(f"\n💎 FinViz Multi-timeframe: {ticker_short} not in top 20 cryptos")
+                        except Exception as fv_error:
+                            pass  # FinViz not available or error
 
                 except Exception as insider_error:
                     print(f"\n⚠️  Could not fetch insider trading data: {insider_error}")

@@ -5,6 +5,7 @@ Clean output formatting for scan results
 from typing import List, Dict
 from ..core.scanner import ScanResult
 from ..config import MAX_RESULTS_DISPLAY
+from ..utils.formatting import format_crypto_price
 
 
 def display_results(results: List[ScanResult], max_display: int = MAX_RESULTS_DISPLAY):
@@ -117,16 +118,8 @@ def display_results(results: List[ScanResult], max_display: int = MAX_RESULTS_DI
                   f"{week_change_str:<12} {vol_str:<14}")
 
         elif is_crypto:
-            # Crypto display
-            price = result.price
-            if price < 0.01:
-                price_str = f"${price:.6f}"
-            elif price < 1:
-                price_str = f"${price:.4f}"
-            elif price < 100:
-                price_str = f"${price:.2f}"
-            else:
-                price_str = f"${price:,.2f}"
+            # Crypto display with smart precision
+            price_str = format_crypto_price(result.price)
 
             # Get day and week change from description
             # Format: "Bitcoin | Day: +2.3% | Week: +8.5%"
@@ -360,6 +353,16 @@ def display_technical_analysis(analysis):
         print("❌ Invalid analysis data")
         return
 
+    # Detect if this is a crypto ticker
+    is_crypto = '-USD' in analysis.ticker.upper() or analysis.ticker.upper().endswith('USD')
+
+    # Helper function to format price based on asset type
+    def fmt_price(price: float) -> str:
+        if is_crypto:
+            return format_crypto_price(price)
+        else:
+            return f"${price:,.2f}"
+
     print(f"\n{'=' * 100}")
     print(f"TECHNICAL ANALYSIS: {analysis.ticker}")
     print(f"{'=' * 100}")
@@ -369,15 +372,15 @@ def display_technical_analysis(analysis):
     print(f"{'=' * 100}")
     print(f"  Score:            {analysis.signal_score}/100 (Grade: {analysis.signal_grade})")
     print(f"  Recommendation:   {analysis.recommendation}")
-    print(f"  Current Price:    ${analysis.current_price:.2f}")
+    print(f"  Current Price:    {fmt_price(analysis.current_price)}")
 
     # VWAP
     print(f"\n📈 VWAP ANALYSIS")
     print(f"{'=' * 100}")
-    print(f"  VWAP:             ${analysis.vwap:.2f}")
+    print(f"  VWAP:             {fmt_price(analysis.vwap)}")
     print(f"  Position:         {analysis.vwap_position}")
-    print(f"  2σ Bands:         ${analysis.vwap_2std[0]:.2f} - ${analysis.vwap_2std[1]:.2f}")
-    print(f"  3σ Bands:         ${analysis.vwap_3std[0]:.2f} - ${analysis.vwap_3std[1]:.2f}")
+    print(f"  2σ Bands:         {fmt_price(analysis.vwap_2std[0])} - {fmt_price(analysis.vwap_2std[1])}")
+    print(f"  3σ Bands:         {fmt_price(analysis.vwap_3std[0])} - {fmt_price(analysis.vwap_3std[1])}")
 
     # MACD
     print(f"\n📉 MACD")
@@ -402,23 +405,23 @@ def display_technical_analysis(analysis):
     # SuperTrend
     print(f"\n🎯 SUPERTREND")
     print(f"{'=' * 100}")
-    print(f"  SuperTrend:       ${analysis.supertrend:.2f}")
+    print(f"  SuperTrend:       {fmt_price(analysis.supertrend)}")
     print(f"  Signal:           {analysis.supertrend_signal}")
 
     # EMAs and SMAs
     print(f"\n📊 MOVING AVERAGES")
     print(f"{'=' * 100}")
-    print(f"  EMA 9:            ${analysis.ema9:.2f}")
-    print(f"  EMA 20:           ${analysis.ema20:.2f}")
+    print(f"  EMA 9:            {fmt_price(analysis.ema9)}")
+    print(f"  EMA 20:           {fmt_price(analysis.ema20)}")
     print(f"  Crossover:        {analysis.ema_crossover}")
 
     # SMAs
     if analysis.sma_20:
-        print(f"  SMA 20:           ${analysis.sma_20:.2f}")
+        print(f"  SMA 20:           {fmt_price(analysis.sma_20)}")
     if analysis.sma_50:
-        print(f"  SMA 50:           ${analysis.sma_50:.2f}")
+        print(f"  SMA 50:           {fmt_price(analysis.sma_50)}")
     if analysis.sma_200:
-        print(f"  SMA 200:          ${analysis.sma_200:.2f}")
+        print(f"  SMA 200:          {fmt_price(analysis.sma_200)}")
     if analysis.sma_trend and analysis.sma_trend != "Neutral":
         print(f"  Trend:            {analysis.sma_trend}")
 
@@ -915,13 +918,23 @@ def display_fibonacci_analysis(fib):
         print("\n⚠️  Insufficient data for Fibonacci analysis")
         return
 
+    # Detect if this is a crypto ticker
+    is_crypto = '-USD' in fib.ticker.upper() or fib.ticker.upper().endswith('USD')
+
+    # Helper function to format price based on asset type
+    def fmt_price(price: float) -> str:
+        if is_crypto:
+            return format_crypto_price(price)
+        else:
+            return f"${price:,.2f}"
+
     print(f"\n{'=' * 100}")
     print(f"🎯 FIBONACCI PROJECTIONS - {fib.ticker}")
     print(f"{'=' * 100}")
 
     # Current status
     print(f"\n📍 CURRENT POSITION")
-    print(f"  Current Price:    ${fib.current_price:.2f}")
+    print(f"  Current Price:    {fmt_price(fib.current_price)}")
     print(f"  Trend:            {fib.trend_direction}")
     print(f"  Prediction:       {fib.prediction}")
     print(f"  Confidence:       {fib.confidence}")
@@ -932,19 +945,19 @@ def display_fibonacci_analysis(fib):
         print(f"  Estimated:        {fib.estimated_days_to_target} days")
         print(f"  Date Range:       {fib.target_date_range}")
         if fib.momentum_per_day:
-            print(f"  Momentum:         ${fib.momentum_per_day:.2f}/day")
+            print(f"  Momentum:         {fmt_price(fib.momentum_per_day)}/day")
 
     # Swing points
     print(f"\n📊 SWING POINTS (Analysis Range)")
-    print(f"  Swing High:       ${fib.swing_high:.2f} ({fib.swing_high_date})")
-    print(f"  Swing Low:        ${fib.swing_low:.2f} ({fib.swing_low_date})")
+    print(f"  Swing High:       {fmt_price(fib.swing_high)} ({fib.swing_high_date})")
+    print(f"  Swing Low:        {fmt_price(fib.swing_low)} ({fib.swing_low_date})")
     price_range = fib.swing_high - fib.swing_low
-    print(f"  Range:            ${price_range:.2f}")
+    print(f"  Range:            {fmt_price(price_range)}")
 
     # Key support/resistance
     print(f"\n🎯 KEY LEVELS")
-    print(f"  Nearest Support:  ${fib.nearest_support:.2f} ({((fib.current_price - fib.nearest_support) / fib.current_price * 100):.1f}% away)")
-    print(f"  Nearest Resistance: ${fib.nearest_resistance:.2f} ({((fib.nearest_resistance - fib.current_price) / fib.current_price * 100):.1f}% away)")
+    print(f"  Nearest Support:  {fmt_price(fib.nearest_support)} ({((fib.current_price - fib.nearest_support) / fib.current_price * 100):.1f}% away)")
+    print(f"  Nearest Resistance: {fmt_price(fib.nearest_resistance)} ({((fib.nearest_resistance - fib.current_price) / fib.current_price * 100):.1f}% away)")
 
     # Retracement levels
     print(f"\n🔽 FIBONACCI RETRACEMENTS (Pullback Zones)")
@@ -966,7 +979,7 @@ def display_fibonacci_analysis(fib):
             status = "Resistance above"
             marker = "  "
 
-        print(f"{marker} {level_name:<13} ${price:<10.2f} {status}")
+        print(f"{marker} {level_name:<13} {fmt_price(price):<10} {status}")
 
     # Extension levels (price targets)
     print(f"\n🎯 FIBONACCI EXTENSIONS (Price Targets)")
@@ -991,7 +1004,7 @@ def display_fibonacci_analysis(fib):
             status = "Completed"
             marker = "✅"
 
-        print(f"{marker} {level_name:<13} ${price:<10.2f} {status}")
+        print(f"{marker} {level_name:<13} {fmt_price(price):<10} {status}")
 
     # Trading guidance
     print(f"\n💡 FIBONACCI TRADING GUIDANCE")
