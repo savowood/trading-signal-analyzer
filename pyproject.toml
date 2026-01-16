@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trading-signal-analyzer"
-version = "2.0.0-alpha.1"
+version = "2.0.0"
 description = "Advanced multi-asset technical analysis and scanning tool for day trading"
 readme = "README.md"
 license = {text = "GPL-3.0"}

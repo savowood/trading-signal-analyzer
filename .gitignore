@@ -1,9 +1,41 @@
+# Python
 __pycache__/
-   *.pyc
-   *.pyo
-   .DS_Store
-   venv/
-   .venv/
-   *.log
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
 
+# Virtual environments
+venv/
+.venv/
+env/
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# User data files
+watchlist.txt
+*.csv
+!requirements*.csv
+
+# Local development
+*.local
+.env
+
+# Build artifacts
+build/
+dist/

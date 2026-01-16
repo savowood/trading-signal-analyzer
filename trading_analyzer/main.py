@@ -953,19 +953,38 @@ def analyze_single_ticker():
 
         # Check if current price is from extended hours
         import datetime
+        import pytz
         last_timestamp = hist.index[-1]
         is_extended_hours = False
         extended_label = ""
 
-        if hasattr(last_timestamp, 'hour'):
-            hour = last_timestamp.hour
-            # Market hours are 9:30 AM - 4:00 PM EST (14:30 - 21:00 UTC typically)
-            if hour < 14 or hour >= 21:
+        try:
+            # Convert timestamp to Eastern Time for market hours check
+            eastern = pytz.timezone('US/Eastern')
+
+            # If timestamp is timezone-aware, convert it
+            if hasattr(last_timestamp, 'tz') and last_timestamp.tz is not None:
+                et_time = last_timestamp.astimezone(eastern)
+            else:
+                # If naive, assume it's already in UTC and localize then convert
+                utc_time = pytz.utc.localize(last_timestamp) if not hasattr(last_timestamp, 'tz') else last_timestamp
+                et_time = utc_time.astimezone(eastern)
+
+            # Market hours: 9:30 AM - 4:00 PM ET
+            hour = et_time.hour
+            minute = et_time.minute
+
+            # Pre-market: before 9:30 AM ET
+            # After-hours: after 4:00 PM ET (16:00)
+            if hour < 9 or (hour == 9 and minute < 30):
                 is_extended_hours = True
-                if hour < 14:
-                    extended_label = " [PRE-MARKET]"
-                else:
-                    extended_label = " [AFTER-HOURS]"
+                extended_label = " [PRE-MARKET]"
+            elif hour >= 16:
+                is_extended_hours = True
+                extended_label = " [AFTER-HOURS]"
+        except Exception as e:
+            # If timezone conversion fails, assume regular hours (safer default)
+            pass
 
         # Volume analysis - use stock.info for actual day's volume (not last candle)
         # This fixes issue with 0 volume showing for intraday charts after hours

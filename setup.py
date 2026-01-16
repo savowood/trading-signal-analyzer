@@ -50,7 +50,7 @@ extras_require = {
 setup(
     # Package Metadata
     name="trading-signal-analyzer",
-    version="2.0.0-alpha.1",
+    version="2.0.0",
     description="Advanced multi-asset technical analysis and scanning tool for day trading",
     long_description=long_description,
     long_description_content_type="text/markdown",
